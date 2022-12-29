@@ -1,0 +1,10 @@
+version: "3.2"
+services:
+  ydb:
+    image: amyasnikov/ydb:slim
+    ports:
+      - "8765:8765"
+      - "2136:2136"
+    environment:
+      - YDB_USE_IN_MEMORY_PDISKS=true
+    hostname: localhost

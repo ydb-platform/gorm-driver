@@ -1,0 +1,50 @@
+name: tests
+
+on:
+  push:
+    branches-ignore:
+      - 'gh-pages'
+  pull_request:
+    branches-ignore:
+      - 'gh-pages'
+
+jobs:
+  # Label of the container job
+  ydb:
+    strategy:
+      matrix:
+        go: ['1.18', '1.19']
+        platform: [ubuntu-latest]
+    runs-on: ${{ matrix.platform }}
+
+    services:
+      ydb:
+        image: amyasnikov/ydb:latest
+        ports:
+          - 2135:2135
+          - 2136:2136
+          - 8765:8765
+        volumes:
+          - /tmp/ydb_certs:/ydb_certs
+        env:
+          YDB_DEFAULT_LOG_LEVEL: 4
+          YDB_USE_IN_MEMORY_PDISKS: true
+        options: '-h localhost'
+
+    env:
+      OS: ${{ matrix.os }}
+      GO: ${{ matrix.go-version }}
+      YDB_CONNECTION_STRING: grpcs://localhost:2135/local
+      YDB_SSL_ROOT_CERTIFICATES_FILE: /tmp/ydb_certs/ca.pem
+
+    steps:
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ matrix.go }}
+
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v3
+
+      - name: Tests
+        run: go test
