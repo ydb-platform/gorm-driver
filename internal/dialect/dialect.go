@@ -7,6 +7,7 @@ import (
 	"math"
 	"path"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -556,9 +557,9 @@ func (d *ydbDialect) GetIndexes(model interface{}) ([]gorm.Index, error) {
 
 var (
 	// CreateClauses create clauses
-	CreateClauses = []string{"VALUES"}
+	CreateClauses = []string{"INSERT"}
 	// QueryClauses query clauses
-	QueryClauses = []string{"SELECT", "WHERE"}
+	QueryClauses = []string{"SELECT"}
 	// UpdateClauses update clauses
 	UpdateClauses = []string{"UPDATE", "SET", "WHERE", "ORDER BY", "LIMIT"}
 	// DeleteClauses delete clauses
@@ -612,15 +613,12 @@ func (d *ydbDialect) Initialize(db *gorm.DB) (err error) {
 	}
 
 	// register callbacks
-	callbackConfig := &callbacks.Config{
+	callbacks.RegisterDefaultCallbacks(db, &callbacks.Config{
 		CreateClauses: CreateClauses,
 		QueryClauses:  QueryClauses,
 		UpdateClauses: UpdateClauses,
 		DeleteClauses: DeleteClauses,
-	}
-
-	callbacks.RegisterDefaultCallbacks(db, callbackConfig)
-	db.Callback().Create()
+	})
 
 	for k, v := range d.ClauseBuilders() {
 		db.ClauseBuilders[k] = v
@@ -631,10 +629,9 @@ func (d *ydbDialect) Initialize(db *gorm.DB) (err error) {
 
 func (d *ydbDialect) ClauseBuilders() map[string]clause.ClauseBuilder {
 	clauseBuilders := map[string]clause.ClauseBuilder{
-		"VALUES": func(c clause.Clause, builder clause.Builder) {
-			if valuesClause, ok := c.Expression.(clause.Values); ok {
-				if stmt, ok := builder.(*gorm.Statement); ok {
-					stmt.SQL.Reset()
+		"INSERT": func(c clause.Clause, builder clause.Builder) {
+			if stmt, ok := builder.(*gorm.Statement); ok {
+				if valuesClause, ok := stmt.Clauses["VALUES"].Expression.(clause.Values); ok {
 					// make params arg
 					rows := make([]types.Value, len(valuesClause.Values))
 					for i, row := range valuesClause.Values {
@@ -646,152 +643,125 @@ func (d *ydbDialect) ClauseBuilders() map[string]clause.ClauseBuilder {
 					}
 					listValue := types.ListValue(rows...)
 
+					stmt.Vars = []interface{}{table.ValueParam("$values", listValue)}
+
 					// write DECLARE for param $values
 					_, _ = stmt.WriteString("DECLARE $values AS ")
 					_, _ = stmt.WriteString(listValue.Type().Yql())
-					_, _ = stmt.WriteString(";")
-
-					// write INSET statement
-					_, _ = stmt.WriteString("\n\nUPSERT INTO `")
-					_, _ = stmt.WriteString(d.fullTableName(stmt.Schema.Table))
+					_, _ = stmt.WriteString("; ")
+					// write INSERT statement
+					_, _ = stmt.WriteString("UPSERT INTO `")
+					_, _ = stmt.WriteString(d.fullTableName(stmt.Table))
 					_, _ = stmt.WriteString("` (")
 					for i, col := range valuesClause.Columns {
 						if i != 0 {
 							_ = stmt.WriteByte(',')
 						}
-						_, _ = stmt.WriteString("\n\t`")
+						_, _ = stmt.WriteString("`")
 						_, _ = stmt.WriteString(col.Name)
 						_, _ = stmt.WriteString("`")
 					}
-					_, _ = stmt.WriteString("\n) SELECT ")
+					_, _ = stmt.WriteString(") SELECT ")
 					for i, col := range valuesClause.Columns {
 						if i != 0 {
 							_ = stmt.WriteByte(',')
 						}
-						_, _ = stmt.WriteString("\n\t`")
+						_, _ = stmt.WriteString("`")
 						_, _ = stmt.WriteString(col.Name)
 						_, _ = stmt.WriteString("`")
 					}
-					_, _ = stmt.WriteString("\nFROM AS_TABLE($values);")
-					stmt.Vars = []interface{}{table.NewQueryParameters(
-						table.ValueParam("$values", listValue),
-					)}
-					return
+					_, _ = stmt.WriteString(" FROM AS_TABLE($values);")
 				}
-				valuesClause.Build(builder)
+				return
 			}
 		},
 		"SELECT": func(c clause.Clause, builder clause.Builder) {
-			if selectClause, ok := c.Expression.(clause.Select); ok {
-				if stmt, ok := builder.(*gorm.Statement); ok {
-					stmt.SQL.Reset()
-					_, _ = stmt.WriteString("SELECT ")
+			if stmt, ok := builder.(*gorm.Statement); ok {
+				sql := builders.Get()
+				defer builders.Put(sql)
+				if selectClause, ok := c.Expression.(clause.Select); ok {
+					_, _ = sql.WriteString("SELECT ")
 					if len(selectClause.Columns) > 0 {
 						for i, col := range selectClause.Columns {
 							if i != 0 {
-								_ = stmt.WriteByte(',')
+								_ = sql.WriteByte(',')
 							}
-							_, _ = stmt.WriteString("\n\t`")
-							_, _ = stmt.WriteString(col.Name)
-							_, _ = stmt.WriteString("`")
+							_, _ = sql.WriteString("`")
+							_, _ = sql.WriteString(col.Name)
+							_, _ = sql.WriteString("`")
 						}
 					} else {
 						for i, col := range stmt.Schema.DBNames {
 							if i != 0 {
-								_ = stmt.WriteByte(',')
+								_ = sql.WriteByte(',')
 							}
-							_, _ = stmt.WriteString("\n\t`")
-							_, _ = stmt.WriteString(col)
-							_, _ = stmt.WriteString("`")
+							_, _ = sql.WriteString("`")
+							_, _ = sql.WriteString(col)
+							_, _ = sql.WriteString("`")
 						}
 					}
-					_, _ = stmt.WriteString("\nFROM `")
-					_, _ = stmt.WriteString(d.fullTableName(stmt.Schema.Table))
-					_, _ = stmt.WriteString("`")
-					return
+					_, _ = sql.WriteString(" FROM `")
+					_, _ = sql.WriteString(d.fullTableName(stmt.Schema.Table))
+					_, _ = sql.WriteString("`")
 				}
-				selectClause.Build(builder)
-			}
-		},
-		"WHERE": func(c clause.Clause, builder clause.Builder) {
-			if whereClause, ok := c.Expression.(clause.Where); ok {
-				if stmt, ok := builder.(*gorm.Statement); ok {
-					_, _ = stmt.WriteString("WHERE ")
-					for exprNum, expr := range whereClause.Exprs {
+				if whereClause, ok := stmt.Clauses["WHERE"].Expression.(clause.Where); ok {
+					_, _ = sql.WriteString(" WHERE ")
+					var params []table.ParameterOption
+					writeExpression := func(column interface{}, op string) (columnName string) {
+						switch c := column.(type) {
+						case clause.Column:
+							columnName = c.Name
+						case string:
+							columnName = c
+						default:
+							panic(fmt.Sprintf("unkown type of %+v", c))
+						}
+						_, _ = sql.WriteString("`")
+						_, _ = sql.WriteString(columnName)
+						_, _ = sql.WriteString("`")
+						_, _ = sql.WriteString(op)
+						columnName = "$arg" + strconv.Itoa(len(params))
+						_, _ = sql.WriteString(columnName)
+						return columnName
+					}
+					for _, expr := range whereClause.Exprs {
 						switch t := expr.(type) {
 						case clause.IN:
-							var columnName string
-							switch c := t.Column.(type) {
-							case clause.Column:
-								columnName = c.Name
-							case string:
-								columnName = c
-							default:
-								panic(fmt.Sprintf("unkown type of %+v", t))
-							}
-							_, _ = stmt.WriteString("`")
-							_, _ = stmt.WriteString(columnName)
-							_, _ = stmt.WriteString("` IN ")
-							columnName = "$_" + columnName + "_" + strconv.Itoa(exprNum)
-							_, _ = stmt.WriteString(columnName)
 							values := make([]types.Value, len(t.Values))
 							for i, in := range t.Values {
 								values[i] = column.Value(in)
 							}
-							stmt.Vars = append(stmt.Vars, table.ValueParam(columnName, types.ListValue(values...)))
+							params = append(params, table.ValueParam(writeExpression(t.Column, " IN "), types.ListValue(values...)))
 						case clause.Like:
-							var columnName string
-							switch c := t.Column.(type) {
-							case clause.Column:
-								columnName = c.Name
-							case string:
-								columnName = c
-							default:
-								panic(fmt.Sprintf("unkown type of %+v", t))
-							}
-							_, _ = stmt.WriteString("`")
-							_, _ = stmt.WriteString(columnName)
-							_, _ = stmt.WriteString("` LIKE ")
-							columnName = "$_" + columnName + "_" + strconv.Itoa(exprNum)
-							_, _ = stmt.WriteString(columnName)
-							stmt.Vars = append(stmt.Vars, table.ValueParam(columnName, column.Value(t.Value)))
+							params = append(params, table.ValueParam(writeExpression(t.Column, " LIKE "), column.Value(t.Value)))
 						case clause.Eq:
-							var columnName string
-							switch c := t.Column.(type) {
-							case clause.Column:
-								columnName = c.Name
-							case string:
-								columnName = c
-							default:
-								panic(fmt.Sprintf("unkown type of %+v", t))
-							}
-							_, _ = stmt.WriteString("`")
-							_, _ = stmt.WriteString(columnName)
-							_, _ = stmt.WriteString("`=")
-							columnName = "$_" + columnName + "_" + strconv.Itoa(exprNum)
-							_, _ = stmt.WriteString(columnName)
-							stmt.Vars = append(stmt.Vars, table.ValueParam(columnName, column.Value(t.Value)))
+							params = append(params, table.ValueParam(writeExpression(t.Column, "="), column.Value(t.Value)))
+						case clause.Neq:
+							params = append(params, table.ValueParam(writeExpression(t.Column, "!="), column.Value(t.Value)))
+						case clause.Gt:
+							params = append(params, table.ValueParam(writeExpression(t.Column, ">"), column.Value(t.Value)))
+						case clause.Gte:
+							params = append(params, table.ValueParam(writeExpression(t.Column, ">="), column.Value(t.Value)))
+						case clause.Lt:
+							params = append(params, table.ValueParam(writeExpression(t.Column, "<"), column.Value(t.Value)))
+						case clause.Lte:
+							params = append(params, table.ValueParam(writeExpression(t.Column, "<="), column.Value(t.Value)))
 						default:
 							panic(fmt.Sprintf("unkown type of %+v", expr))
 						}
-					}
-					// prepend declare section
-					query := stmt.SQL.String()
-					stmt.SQL.Reset()
-					params := make([]table.ParameterOption, len(stmt.Vars))
-					for i, v := range stmt.Vars {
-						params[i] = v.(table.ParameterOption)
 					}
 					declares, err := sugar.GenerateDeclareSection(params)
 					if err != nil {
 						_ = stmt.AddError(err)
 						return
 					}
-					_, _ = stmt.WriteString(declares)
-					_, _ = stmt.WriteString(query)
-					return
+					_, _ = stmt.WriteString(strings.ReplaceAll(declares, "\n", " "))
+					for _, param := range params {
+						stmt.Vars = append(stmt.Vars, param)
+					}
 				}
-				whereClause.Build(builder)
+				_, _ = stmt.WriteString(sql.String())
+				return
 			}
 		},
 	}
