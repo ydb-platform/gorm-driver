@@ -71,7 +71,7 @@ type ydbDialect struct {
 
 	cacheStore sync.Map
 
-	db       ydb.Connection
+	db       *ydb.Driver
 	gorm     *gorm.DB
 	migrator migrator.Migrator
 }
