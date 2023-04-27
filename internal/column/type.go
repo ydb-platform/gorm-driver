@@ -144,6 +144,8 @@ func Value(value interface{}) types.Value {
 		return types.DatetimeValueFromTime(v)
 	case time.Duration:
 		return types.IntervalValueFromDuration(v)
+	case gorm.DeletedAt:
+		return types.DatetimeValueFromTime(v.Time)
 	default:
 		panic(fmt.Sprintf("unsupported type %+v", v))
 	}
