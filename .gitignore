@@ -1,0 +1,17 @@
+.idea
+.DS_Store
+*.code-workspace
+.vscode/*
+.history/
+.devcontainer
+*.vsix
+*.swp
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor
+changes.txt
