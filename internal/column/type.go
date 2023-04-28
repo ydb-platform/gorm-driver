@@ -131,6 +131,10 @@ func Value(value interface{}) types.Value {
 		return types.Int64Value(v)
 	case uint64:
 		return types.Uint64Value(v)
+	case int:
+		return types.Int64Value(int64(v))
+	case uint:
+		return types.Uint64Value(uint64(v))
 	case float32:
 		return types.FloatValue(v)
 	case float64:
