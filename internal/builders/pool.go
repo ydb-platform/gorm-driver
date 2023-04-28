@@ -5,9 +5,7 @@ import (
 	"sync"
 )
 
-var (
-	builders sync.Pool
-)
+var builders sync.Pool
 
 func Get() *strings.Builder {
 	v := builders.Get()

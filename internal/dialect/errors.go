@@ -2,6 +2,4 @@ package dialect
 
 import "errors"
 
-var (
-	errIndexNotFount = errors.New("index not found")
-)
+var errIndexNotFount = errors.New("index not found")

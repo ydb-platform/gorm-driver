@@ -1,12 +1,12 @@
 package dialect
 
 import (
-	"gorm.io/gorm/schema"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm/schema"
 )
 
 type Season struct {

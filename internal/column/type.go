@@ -6,11 +6,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"gorm.io/gorm"
 	"gorm.io/gorm/migrator"
 	"gorm.io/gorm/schema"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 var TypeAliasMap = map[string][]string{
