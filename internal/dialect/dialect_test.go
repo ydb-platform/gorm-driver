@@ -216,7 +216,9 @@ func Test_createIndexQuery(t *testing.T) {
 					},
 				},
 			},
-			sql: `ALTER TABLE "/testing/mock/seasons" ADD INDEX "idx_seasons_title_first_aired_last_aired" GLOBAL ON ("title", "first_aired", "last_aired");`,
+			sql: `ALTER TABLE "/testing/mock/seasons" ` +
+				`ADD INDEX "idx_seasons_title_first_aired_last_aired" ` +
+				`GLOBAL ON ("title", "first_aired", "last_aired");`,
 		},
 		{
 			tableName: "series",

@@ -97,7 +97,9 @@ func (d *ydbDialect) FullDataTypeOf(field *schema.Field) (expr clause.Expr) {
 	return
 }
 
-func (d *ydbDialect) tableDescription(ctx context.Context, tablePath string) (description options.Description, _ error) {
+func (d *ydbDialect) tableDescription(ctx context.Context, tablePath string) (
+	description options.Description, _ error,
+) {
 	err := d.db.Table().Do(ctx, func(ctx context.Context, s table.Session) (err error) {
 		description, err = s.DescribeTable(ctx, tablePath)
 		return err
@@ -623,7 +625,7 @@ func (d *ydbDialect) Initialize(db *gorm.DB) (err error) {
 		db.ClauseBuilders[k] = v
 	}
 
-	return
+	return err
 }
 
 func (d *ydbDialect) ClauseBuilders() map[string]clause.ClauseBuilder {
@@ -713,7 +715,7 @@ func (d *ydbDialect) ClauseBuilders() map[string]clause.ClauseBuilder {
 						case string:
 							columnName = c
 						default:
-							panic(fmt.Sprintf("unkown type of %+v", c))
+							panic(fmt.Sprintf("unknown type of %+v", c))
 						}
 						_, _ = b.WriteString("`")
 						_, _ = b.WriteString(columnName)
@@ -746,7 +748,7 @@ func (d *ydbDialect) ClauseBuilders() map[string]clause.ClauseBuilder {
 						case clause.Lte:
 							params = append(params, table.ValueParam(writeExpression(t.Column, "<="), column.Value(t.Value)))
 						default:
-							panic(fmt.Sprintf("unkown type of %+v", expr))
+							panic(fmt.Sprintf("unknown type of %+v", expr))
 						}
 					}
 					declares, err := sugar.GenerateDeclareSection(params)
@@ -810,11 +812,11 @@ func (d *ydbDialect) QuoteTo(writer clause.Writer, str string) {
 				_ = writer.WriteByte('`')
 				underQuoted = true
 				if selfQuoted = continuousBacktick > 0; selfQuoted {
-					continuousBacktick -= 1
+					continuousBacktick--
 				}
 			}
 
-			for ; continuousBacktick > 0; continuousBacktick -= 1 {
+			for ; continuousBacktick > 0; continuousBacktick-- {
 				_, _ = writer.WriteString("``")
 			}
 
