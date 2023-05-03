@@ -1,25 +1,52 @@
 name: tests
-
 on:
   push:
-    branches-ignore:
-      - 'gh-pages'
+    branches: [ main ]
   pull_request:
-    branches-ignore:
-      - 'gh-pages'
-
+  workflow_dispatch:
 jobs:
-  # Label of the container job
-  ydb:
+  unit:
     strategy:
       matrix:
-        go: ['1.18', '1.19']
-        platform: [ubuntu-latest]
-    runs-on: ${{ matrix.platform }}
-
+        go-version: [ 1.18.x, 1.19.x, 1.20.x ]
+        os: [ ubuntu, windows, macOS ]
+    concurrency:
+      group: unit-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}
+      cancel-in-progress: true
+    env:
+      OS: ${{ matrix.os }}-latest
+      GO: ${{ matrix.go-version }}
+    runs-on: ${{ matrix.os }}-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Install Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache: true
+      - name: Test
+        run: go test -race -coverprofile unit.txt -covermode atomic ./internal/...
+      - name: Upload coverage report to Codecov
+        uses: codecov/codecov-action@v2
+        with:
+          file: ./unit.txt
+          flags: unit,${{ matrix.os }},go-${{ matrix.go-version }}
+          name: unit
+  integration:
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version: [ 1.18.x, 1.19.x, 1.20.x ]
+        ydb-version: [ 22.5, 23.1 ]
+        os: [ ubuntu ]
+    concurrency:
+      group: integration-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}-${{ matrix.ydb-version }}
+      cancel-in-progress: true
+    runs-on: ${{ matrix.os }}-latest
     services:
       ydb:
-        image: amyasnikov/ydb:latest
+        image: cr.yandex/yc/yandex-docker-local-ydb:${{ matrix.ydb-version }}-slim
         ports:
           - 2135:2135
           - 2136:2136
@@ -27,24 +54,27 @@ jobs:
         volumes:
           - /tmp/ydb_certs:/ydb_certs
         env:
-          YDB_DEFAULT_LOG_LEVEL: 4
+          YDB_LOCAL_SURVIVE_RESTART: true
           YDB_USE_IN_MEMORY_PDISKS: true
         options: '-h localhost'
-
     env:
-      OS: ${{ matrix.os }}
+      OS: ${{ matrix.os }}-latest
       GO: ${{ matrix.go-version }}
-      YDB_CONNECTION_STRING: grpcs://localhost:2135/local
+      YDB_CONNECTION_STRING: grpc://localhost:2136/local
       YDB_SSL_ROOT_CERTIFICATES_FILE: /tmp/ydb_certs/ca.pem
-
     steps:
-      - name: Set up Go 1.x
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Install Go
         uses: actions/setup-go@v3
         with:
-          go-version: ${{ matrix.go }}
-
-      - name: Check out code into the Go module directory
-        uses: actions/checkout@v3
-
-      - name: Tests
-        run: go test
+          go-version: ${{ matrix.go-version }}
+          cache: true
+      - name: Integration test
+        run: go test -race -tags integration -coverpkg=./... -coverprofile integration.txt -covermode atomic ./...
+      - name: Upload Test secure connection coverage report to Codecov
+        uses: codecov/codecov-action@v2
+        with:
+          file: ./integration.txt
+          flags: integration,${{ matrix.os }},ydb-${{ matrix.ydb-version }},go-${{ matrix.go-version }}
+          name: integration
