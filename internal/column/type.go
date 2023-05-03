@@ -148,7 +148,23 @@ func Value(value interface{}) types.Value {
 	case time.Duration:
 		return types.IntervalValueFromDuration(v)
 	case gorm.DeletedAt:
-		return types.DatetimeValueFromTime(v.Time)
+		return types.NullableDatetimeValueFromTime(&v.Time)
+	case sql.NullBool:
+		return types.NullableBoolValue(&v.Bool)
+	case sql.NullByte:
+		return types.NullableUint8Value(&v.Byte)
+	case sql.NullInt16:
+		return types.NullableInt16Value(&v.Int16)
+	case sql.NullInt32:
+		return types.NullableInt32Value(&v.Int32)
+	case sql.NullInt64:
+		return types.NullableInt64Value(&v.Int64)
+	case sql.NullFloat64:
+		return types.NullableDoubleValue(&v.Float64)
+	case sql.NullString:
+		return types.NullableTextValue(&v.String)
+	case sql.NullTime:
+		return types.NullableDatetimeValueFromTime(&v.Time)
 	default:
 		panic(fmt.Sprintf("unsupported type %+v", v))
 	}
