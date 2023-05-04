@@ -76,5 +76,5 @@ jobs:
         uses: codecov/codecov-action@v2
         with:
           file: ./integration.txt
-          flags: integration,${{ matrix.os }},ydb-${{ matrix.ydb-version }},go-${{ matrix.go-version }}
+          flags: integration,${{ matrix.os }},go-${{ matrix.go-version }},db-${{ matrix.ydb-version }}
           name: integration
