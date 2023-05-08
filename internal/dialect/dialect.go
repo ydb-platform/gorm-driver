@@ -3,6 +3,7 @@ package dialect
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"fmt"
 	"math"
 	"path"
@@ -11,8 +12,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
+	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
-
 	"gorm.io/gorm"
 	"gorm.io/gorm/callbacks"
 	"gorm.io/gorm/clause"
@@ -23,11 +28,6 @@ import (
 	"github.com/ydb-platform/gorm-driver/internal/builders"
 	"github.com/ydb-platform/gorm-driver/internal/column"
 	"github.com/ydb-platform/gorm-driver/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
-	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 )
 
 type Option func(d *ydbDialect)
@@ -98,7 +98,9 @@ func (d *ydbDialect) FullDataTypeOf(field *schema.Field) (expr clause.Expr) {
 	return
 }
 
-func (d *ydbDialect) tableDescription(ctx context.Context, tablePath string) (description options.Description, _ error) {
+func (d *ydbDialect) tableDescription(ctx context.Context, tablePath string) (
+	description options.Description, _ error,
+) {
 	err := d.db.Table().Do(ctx, func(ctx context.Context, s table.Session) (err error) {
 		description, err = s.DescribeTable(ctx, tablePath)
 		return err
@@ -107,85 +109,87 @@ func (d *ydbDialect) tableDescription(ctx context.Context, tablePath string) (de
 }
 
 func (d *ydbDialect) schemaByValue(model interface{}) (*schema.Schema, error) {
-	schema, err := schema.Parse(model, &d.cacheStore, d)
+	s, err := schema.Parse(model, &d.cacheStore, d)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	return schema, nil
+	return s, nil
 }
 
 func (d *ydbDialect) GetTypeAliases(databaseTypeName string) []string {
-	//TODO implement me
+	//nolint:godox
+	// TODO implement me
 	panic("implement me")
 }
 
 func (d *ydbDialect) createTableQuery(model interface{}) (string, error) {
-	schema, err := d.schemaByValue(model)
+	s, err := d.schemaByValue(model)
 	if err != nil {
 		return "", xerrors.WithStackTrace(err)
 	}
 
-	sql := builders.Get()
-	defer builders.Put(sql)
+	b := builders.Get()
+	defer builders.Put(b)
 
-	sql.WriteString("CREATE TABLE `")
-	sql.WriteString(d.fullTableName(schema.Table))
-	sql.WriteString("` (")
+	b.WriteString("CREATE TABLE `")
+	b.WriteString(d.fullTableName(s.Table))
+	b.WriteString("` (")
 
-	for i, columnName := range schema.DBNames {
+	for i, columnName := range s.DBNames {
 		if i > 0 {
-			sql.WriteString(", ")
+			b.WriteString(", ")
 		}
-		field := schema.FieldsByDBName[columnName]
+		field := s.FieldsByDBName[columnName]
 		if !field.IgnoreMigration {
-			sql.WriteString("\n\t`")
-			sql.WriteString(columnName)
-			sql.WriteString("` ")
-			sql.WriteString(dataTypeOf(field))
+			b.WriteString("\n\t`")
+			b.WriteString(columnName)
+			b.WriteString("` ")
+			b.WriteString(dataTypeOf(field))
 		}
 	}
+	//nolint:godox
 	// TODO: if nothing primary keys???
-	if len(schema.PrimaryFields) > 0 {
-		sql.WriteString(",\n\tPRIMARY KEY (")
-		for i, pk := range schema.PrimaryFields {
+	if len(s.PrimaryFields) > 0 {
+		b.WriteString(",\n\tPRIMARY KEY (")
+		for i, pk := range s.PrimaryFields {
 			if i > 0 {
-				sql.WriteString(", ")
+				b.WriteString(", ")
 			}
-			sql.WriteString("`")
-			sql.WriteString(pk.DBName)
-			sql.WriteString("`")
+			b.WriteString("`")
+			b.WriteString(pk.DBName)
+			b.WriteString("`")
 		}
-		sql.WriteString(")")
+		b.WriteString(")")
 	}
-	for _, idx := range schema.ParseIndexes() {
-		sql.WriteString(",\n\tINDEX `")
-		sql.WriteString(idx.Name)
-		sql.WriteString("` GLOBAL ON (")
+	for _, idx := range s.ParseIndexes() {
+		b.WriteString(",\n\tINDEX `")
+		b.WriteString(idx.Name)
+		b.WriteString("` GLOBAL ON (")
 		for i, field := range idx.Fields {
 			if i > 0 {
-				sql.WriteString(", ")
+				b.WriteString(", ")
 			}
-			sql.WriteString("`")
-			sql.WriteString(field.DBName)
-			sql.WriteString("`")
+			b.WriteString("`")
+			b.WriteString(field.DBName)
+			b.WriteString("`")
 		}
-		sql.WriteString(")")
+		b.WriteString(")")
 	}
-	sql.WriteString("\n);")
+	b.WriteString("\n);")
 
-	return sql.String(), nil
+	return b.String(), nil
 }
 
 func (d *ydbDialect) CreateTable(models ...interface{}) error {
 	stmt := d.gorm.Statement
 	ctx := stmt.Context
 	for _, model := range models {
-		sql, err := d.createTableQuery(model)
+		query, err := d.createTableQuery(model)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
 		err = d.db.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
-			return s.ExecuteSchemeQuery(ctx, sql)
+			return s.ExecuteSchemeQuery(ctx, query)
 		}, table.WithIdempotent())
 		if err != nil {
 			return xerrors.WithStackTrace(err)
@@ -195,19 +199,19 @@ func (d *ydbDialect) CreateTable(models ...interface{}) error {
 }
 
 func (d *ydbDialect) dropTableQuery(model interface{}) (_ string, err error) {
-	schema, err := d.schemaByValue(model)
+	s, err := d.schemaByValue(model)
 	if err != nil {
 		return "", xerrors.WithStackTrace(err)
 	}
 
-	sql := builders.Get()
-	defer builders.Put(sql)
+	b := builders.Get()
+	defer builders.Put(b)
 
-	sql.WriteString("DROP TABLE `")
-	sql.WriteString(d.fullTableName(schema.Table))
-	sql.WriteString("`;")
+	b.WriteString("DROP TABLE `")
+	b.WriteString(d.fullTableName(s.Table))
+	b.WriteString("`;")
 
-	return sql.String(), nil
+	return b.String(), nil
 }
 
 func (d *ydbDialect) DropTable(models ...interface{}) error {
@@ -215,12 +219,12 @@ func (d *ydbDialect) DropTable(models ...interface{}) error {
 	ctx := stmt.Context
 	for _, model := range models {
 		if d.HasTable(model) {
-			sql, err := d.dropTableQuery(model)
+			query, err := d.dropTableQuery(model)
 			if err != nil {
 				return xerrors.WithStackTrace(err)
 			}
 			err = d.db.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
-				return s.ExecuteSchemeQuery(ctx, sql)
+				return s.ExecuteSchemeQuery(ctx, query)
 			}, table.WithIdempotent())
 			if err != nil {
 				return xerrors.WithStackTrace(err)
@@ -232,12 +236,12 @@ func (d *ydbDialect) DropTable(models ...interface{}) error {
 
 func (d *ydbDialect) HasTable(model interface{}) bool {
 	stmt := d.gorm.Statement
-	schema, err := d.schemaByValue(model)
+	s, err := d.schemaByValue(model)
 	if err != nil {
 		_ = stmt.AddError(xerrors.WithStackTrace(err))
 		return false
 	}
-	exists, err := sugar.IsTableExists(stmt.Context, d.db.Scheme(), d.fullTableName(schema.Table))
+	exists, err := sugar.IsTableExists(stmt.Context, d.db.Scheme(), d.fullTableName(s.Table))
 	if err != nil {
 		_ = stmt.AddError(xerrors.WithStackTrace(err))
 		return false
@@ -246,7 +250,8 @@ func (d *ydbDialect) HasTable(model interface{}) bool {
 }
 
 func (d *ydbDialect) RenameTable(oldName, newName interface{}) error {
-	//TODO implement me
+	//nolint:godox
+	// TODO implement me
 	panic("implement me")
 }
 
@@ -276,34 +281,34 @@ func (d *ydbDialect) GetTables() (tableList []string, err error) {
 }
 
 func (d *ydbDialect) addColumnQuery(model interface{}, columnName string) (_ string, err error) {
-	schema, err := d.schemaByValue(model)
+	s, err := d.schemaByValue(model)
 	if err != nil {
 		return "", err
 	}
-	field := schema.LookUpField(columnName)
+	field := s.LookUpField(columnName)
 
-	sql := builders.Get()
-	defer builders.Put(sql)
+	b := builders.Get()
+	defer builders.Put(b)
 
-	sql.WriteString("ALTER TABLE `")
-	sql.WriteString(d.TableName(schema.Table))
-	sql.WriteString("` ADD COLUMN `")
-	sql.WriteString(columnName)
-	sql.WriteString("` ")
-	sql.WriteString(d.DataTypeOf(field))
-	sql.WriteString(";")
+	b.WriteString("ALTER TABLE `")
+	b.WriteString(d.TableName(s.Table))
+	b.WriteString("` ADD COLUMN `")
+	b.WriteString(columnName)
+	b.WriteString("` ")
+	b.WriteString(d.DataTypeOf(field))
+	b.WriteString(";")
 
-	return sql.String(), nil
+	return b.String(), nil
 }
 
 func (d *ydbDialect) AddColumn(model interface{}, columnName string) error {
-	sql, err := d.addColumnQuery(model, columnName)
+	query, err := d.addColumnQuery(model, columnName)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 
 	err = d.db.Table().Do(d.gorm.Statement.Context, func(ctx context.Context, s table.Session) error {
-		return s.ExecuteSchemeQuery(ctx, sql)
+		return s.ExecuteSchemeQuery(ctx, query)
 	}, table.WithIdempotent())
 
 	if err != nil {
@@ -314,31 +319,31 @@ func (d *ydbDialect) AddColumn(model interface{}, columnName string) error {
 }
 
 func (d *ydbDialect) dropColumnQuery(model interface{}, columnName string) (_ string, err error) {
-	schema, err := d.schemaByValue(model)
+	s, err := d.schemaByValue(model)
 	if err != nil {
 		return "", err
 	}
 
-	sql := builders.Get()
-	defer builders.Put(sql)
+	b := builders.Get()
+	defer builders.Put(b)
 
-	sql.WriteString("ALTER TABLE `")
-	sql.WriteString(d.fullTableName(schema.Table))
-	sql.WriteString("` DROP COLUMN `")
-	sql.WriteString(columnName)
-	sql.WriteString("`;")
+	b.WriteString("ALTER TABLE `")
+	b.WriteString(d.fullTableName(s.Table))
+	b.WriteString("` DROP COLUMN `")
+	b.WriteString(columnName)
+	b.WriteString("`;")
 
-	return sql.String(), nil
+	return b.String(), nil
 }
 
 func (d *ydbDialect) DropColumn(model interface{}, columnName string) error {
-	sql, err := d.dropColumnQuery(model, columnName)
+	query, err := d.dropColumnQuery(model, columnName)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 
 	err = d.db.Table().Do(d.gorm.Statement.Context, func(ctx context.Context, s table.Session) error {
-		return s.ExecuteSchemeQuery(ctx, sql)
+		return s.ExecuteSchemeQuery(ctx, query)
 	}, table.WithIdempotent())
 
 	if err != nil {
@@ -349,32 +354,36 @@ func (d *ydbDialect) DropColumn(model interface{}, columnName string) error {
 }
 
 func (d *ydbDialect) AlterColumn(model interface{}, field string) error {
-	//TODO implement me
+	//nolint:godox
+	// TODO implement me
 	panic("implement me")
 }
 
 func (d *ydbDialect) MigrateColumn(model interface{}, field *schema.Field, columnType gorm.ColumnType) error {
-	//TODO implement me
+	//nolint:godox
+	// TODO implement me
 	panic("implement me")
 }
 
 func (d *ydbDialect) HasColumn(model interface{}, field string) bool {
-	//TODO implement me
+	//nolint:godox
+	// TODO implement me
 	panic("implement me")
 }
 
 func (d *ydbDialect) RenameColumn(model interface{}, oldName, field string) error {
-	//TODO implement me
+	//nolint:godox
+	// TODO implement me
 	panic("implement me")
 }
 
 func (d *ydbDialect) ColumnTypes(model interface{}) (columnTypes []gorm.ColumnType, _ error) {
-	schema, err := d.schemaByValue(model)
+	s, err := d.schemaByValue(model)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	for _, f := range schema.Fields {
+	for _, f := range s.Fields {
 		c, _, err := column.Type(f)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
@@ -386,51 +395,56 @@ func (d *ydbDialect) ColumnTypes(model interface{}) (columnTypes []gorm.ColumnTy
 }
 
 func (d *ydbDialect) CreateView(name string, option gorm.ViewOption) error {
-	//TODO implement me
+	//nolint:godox
+	// TODO implement me
 	panic("implement me")
 }
 
 func (d *ydbDialect) DropView(name string) error {
-	//TODO implement me
+	//nolint:godox
+	// TODO implement me
 	panic("implement me")
 }
 
 func (d *ydbDialect) CreateConstraint(model interface{}, name string) error {
-	//TODO implement me
+	//nolint:godox
+	// TODO implement me
 	panic("implement me")
 }
 
 func (d *ydbDialect) DropConstraint(model interface{}, name string) error {
-	//TODO implement me
+	//nolint:godox
+	// TODO implement me
 	panic("implement me")
 }
 
 func (d *ydbDialect) HasConstraint(model interface{}, name string) bool {
-	//TODO implement me
+	//nolint:godox
+	// TODO implement me
 	panic("implement me")
 }
 
 func (d *ydbDialect) createIndexQuery(tableName string, idx *schema.Index) (_ string, err error) {
-	sql := builders.Get()
-	defer builders.Put(sql)
+	b := builders.Get()
+	defer builders.Put(b)
 
-	sql.WriteString("ALTER TABLE `")
-	sql.WriteString(d.fullTableName(tableName))
-	sql.WriteString("` ADD INDEX `")
-	sql.WriteString(idx.Name)
-	sql.WriteString("` GLOBAL ON (")
+	b.WriteString("ALTER TABLE `")
+	b.WriteString(d.fullTableName(tableName))
+	b.WriteString("` ADD INDEX `")
+	b.WriteString(idx.Name)
+	b.WriteString("` GLOBAL ON (")
 
 	for i, field := range idx.Fields {
 		if i != 0 {
-			sql.WriteString(", ")
+			b.WriteString(", ")
 		}
-		sql.WriteByte('`')
-		sql.WriteString(field.DBName)
-		sql.WriteByte('`')
+		b.WriteByte('`')
+		b.WriteString(field.DBName)
+		b.WriteByte('`')
 	}
-	sql.WriteString(");")
+	b.WriteString(");")
 
-	return sql.String(), nil
+	return b.String(), nil
 }
 
 func (d *ydbDialect) CreateIndex(model interface{}, indexName string) error {
@@ -444,13 +458,13 @@ func (d *ydbDialect) CreateIndex(model interface{}, indexName string) error {
 		return xerrors.WithStackTrace(errIndexNotFount)
 	}
 
-	sql, err := d.createIndexQuery(d.fullTableName(s.Table), idx)
+	query, err := d.createIndexQuery(d.fullTableName(s.Table), idx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 
 	err = d.db.Table().Do(d.gorm.Statement.Context, func(ctx context.Context, s table.Session) error {
-		return s.ExecuteSchemeQuery(ctx, sql)
+		return s.ExecuteSchemeQuery(ctx, query)
 	}, table.WithIdempotent())
 	if err != nil {
 		return xerrors.WithStackTrace(err)
@@ -460,16 +474,16 @@ func (d *ydbDialect) CreateIndex(model interface{}, indexName string) error {
 }
 
 func dropIndexQuery(fullTablePath string, indexName string) (_ string, err error) {
-	sql := builders.Get()
-	defer builders.Put(sql)
+	b := builders.Get()
+	defer builders.Put(b)
 
-	sql.WriteString("ALTER TABLE `")
-	sql.WriteString(fullTablePath)
-	sql.WriteString("` DROP INDEX `")
-	sql.WriteString(indexName)
-	sql.WriteString("`;")
+	b.WriteString("ALTER TABLE `")
+	b.WriteString(fullTablePath)
+	b.WriteString("` DROP INDEX `")
+	b.WriteString(indexName)
+	b.WriteString("`;")
 
-	return sql.String(), nil
+	return b.String(), nil
 }
 
 func (d *ydbDialect) DropIndex(model interface{}, indexName string) error {
@@ -483,13 +497,13 @@ func (d *ydbDialect) DropIndex(model interface{}, indexName string) error {
 		return xerrors.WithStackTrace(errIndexNotFount)
 	}
 
-	sql, err := dropIndexQuery(d.TableName(s.Table), indexName)
+	query, err := dropIndexQuery(d.TableName(s.Table), indexName)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 
 	err = d.db.Table().Do(d.gorm.Statement.Context, func(ctx context.Context, s table.Session) error {
-		return s.ExecuteSchemeQuery(ctx, sql)
+		return s.ExecuteSchemeQuery(ctx, query)
 	}, table.WithIdempotent())
 	if err != nil {
 		return xerrors.WithStackTrace(err)
@@ -551,7 +565,8 @@ func (d *ydbDialect) RenameIndex(model interface{}, oldName, newName string) err
 }
 
 func (d *ydbDialect) GetIndexes(model interface{}) ([]gorm.Index, error) {
-	//TODO implement me
+	//nolint:godox
+	// TODO implement me
 	panic("implement me")
 }
 
@@ -599,7 +614,8 @@ func (d *ydbDialect) Initialize(db *gorm.DB) (err error) {
 	}
 
 	if db.ConnPool == nil {
-		connector, err := ydb.Connector(d.db)
+		var connector driver.Connector
+		connector, err = ydb.Connector(d.db)
 		if err != nil {
 			return err
 		}
@@ -624,146 +640,13 @@ func (d *ydbDialect) Initialize(db *gorm.DB) (err error) {
 		db.ClauseBuilders[k] = v
 	}
 
-	return
+	return err
 }
 
 func (d *ydbDialect) ClauseBuilders() map[string]clause.ClauseBuilder {
 	clauseBuilders := map[string]clause.ClauseBuilder{
-		"INSERT": func(c clause.Clause, builder clause.Builder) {
-			if stmt, ok := builder.(*gorm.Statement); ok {
-				if valuesClause, ok := stmt.Clauses["VALUES"].Expression.(clause.Values); ok {
-					// make params arg
-					rows := make([]types.Value, len(valuesClause.Values))
-					for i, row := range valuesClause.Values {
-						fields := make([]types.StructValueOption, len(row))
-						for j, v := range row {
-							fields[j] = types.StructFieldValue(valuesClause.Columns[j].Name, column.Value(v))
-						}
-						rows[i] = types.StructValue(fields...)
-					}
-					listValue := types.ListValue(rows...)
-
-					stmt.Vars = []interface{}{table.ValueParam("$values", listValue)}
-
-					// write DECLARE for param $values
-					_, _ = stmt.WriteString("DECLARE $values AS ")
-					_, _ = stmt.WriteString(listValue.Type().Yql())
-					_, _ = stmt.WriteString("; ")
-					// write INSERT statement
-					_, _ = stmt.WriteString("UPSERT INTO `")
-					_, _ = stmt.WriteString(d.fullTableName(stmt.Table))
-					_, _ = stmt.WriteString("` (")
-					for i, col := range valuesClause.Columns {
-						if i != 0 {
-							_ = stmt.WriteByte(',')
-						}
-						_, _ = stmt.WriteString("`")
-						_, _ = stmt.WriteString(col.Name)
-						_, _ = stmt.WriteString("`")
-					}
-					_, _ = stmt.WriteString(") SELECT ")
-					for i, col := range valuesClause.Columns {
-						if i != 0 {
-							_ = stmt.WriteByte(',')
-						}
-						_, _ = stmt.WriteString("`")
-						_, _ = stmt.WriteString(col.Name)
-						_, _ = stmt.WriteString("`")
-					}
-					_, _ = stmt.WriteString(" FROM AS_TABLE($values);")
-				}
-				return
-			}
-		},
-		"SELECT": func(c clause.Clause, builder clause.Builder) {
-			if stmt, ok := builder.(*gorm.Statement); ok {
-				sql := builders.Get()
-				defer builders.Put(sql)
-				if selectClause, ok := c.Expression.(clause.Select); ok {
-					_, _ = sql.WriteString("SELECT ")
-					if len(selectClause.Columns) > 0 {
-						for i, col := range selectClause.Columns {
-							if i != 0 {
-								_ = sql.WriteByte(',')
-							}
-							_, _ = sql.WriteString("`")
-							_, _ = sql.WriteString(col.Name)
-							_, _ = sql.WriteString("`")
-						}
-					} else {
-						for i, col := range stmt.Schema.DBNames {
-							if i != 0 {
-								_ = sql.WriteByte(',')
-							}
-							_, _ = sql.WriteString("`")
-							_, _ = sql.WriteString(col)
-							_, _ = sql.WriteString("`")
-						}
-					}
-					_, _ = sql.WriteString(" FROM `")
-					_, _ = sql.WriteString(d.fullTableName(stmt.Schema.Table))
-					_, _ = sql.WriteString("`")
-				}
-				if whereClause, ok := stmt.Clauses["WHERE"].Expression.(clause.Where); ok {
-					_, _ = sql.WriteString(" WHERE ")
-					var params []table.ParameterOption
-					writeExpression := func(column interface{}, op string) (columnName string) {
-						switch c := column.(type) {
-						case clause.Column:
-							columnName = c.Name
-						case string:
-							columnName = c
-						default:
-							panic(fmt.Sprintf("unkown type of %+v", c))
-						}
-						_, _ = sql.WriteString("`")
-						_, _ = sql.WriteString(columnName)
-						_, _ = sql.WriteString("`")
-						_, _ = sql.WriteString(op)
-						columnName = "$arg" + strconv.Itoa(len(params))
-						_, _ = sql.WriteString(columnName)
-						return columnName
-					}
-					for _, expr := range whereClause.Exprs {
-						switch t := expr.(type) {
-						case clause.IN:
-							values := make([]types.Value, len(t.Values))
-							for i, in := range t.Values {
-								values[i] = column.Value(in)
-							}
-							params = append(params, table.ValueParam(writeExpression(t.Column, " IN "), types.ListValue(values...)))
-						case clause.Like:
-							params = append(params, table.ValueParam(writeExpression(t.Column, " LIKE "), column.Value(t.Value)))
-						case clause.Eq:
-							params = append(params, table.ValueParam(writeExpression(t.Column, "="), column.Value(t.Value)))
-						case clause.Neq:
-							params = append(params, table.ValueParam(writeExpression(t.Column, "!="), column.Value(t.Value)))
-						case clause.Gt:
-							params = append(params, table.ValueParam(writeExpression(t.Column, ">"), column.Value(t.Value)))
-						case clause.Gte:
-							params = append(params, table.ValueParam(writeExpression(t.Column, ">="), column.Value(t.Value)))
-						case clause.Lt:
-							params = append(params, table.ValueParam(writeExpression(t.Column, "<"), column.Value(t.Value)))
-						case clause.Lte:
-							params = append(params, table.ValueParam(writeExpression(t.Column, "<="), column.Value(t.Value)))
-						default:
-							panic(fmt.Sprintf("unkown type of %+v", expr))
-						}
-					}
-					declares, err := sugar.GenerateDeclareSection(params)
-					if err != nil {
-						_ = stmt.AddError(err)
-						return
-					}
-					_, _ = stmt.WriteString(strings.ReplaceAll(declares, "\n", " "))
-					for _, param := range params {
-						stmt.Vars = append(stmt.Vars, param)
-					}
-				}
-				_, _ = stmt.WriteString(sql.String())
-				return
-			}
-		},
+		"INSERT": d.insertBuilder,
+		"SELECT": d.selectBuilder,
 	}
 
 	return clauseBuilders
@@ -811,11 +694,11 @@ func (d *ydbDialect) QuoteTo(writer clause.Writer, str string) {
 				_ = writer.WriteByte('`')
 				underQuoted = true
 				if selfQuoted = continuousBacktick > 0; selfQuoted {
-					continuousBacktick -= 1
+					continuousBacktick--
 				}
 			}
 
-			for ; continuousBacktick > 0; continuousBacktick -= 1 {
+			for ; continuousBacktick > 0; continuousBacktick-- {
 				_, _ = writer.WriteString("``")
 			}
 
@@ -852,4 +735,152 @@ func dataTypeOf(f *schema.Field) string {
 
 func (d *ydbDialect) DataTypeOf(f *schema.Field) string {
 	return dataTypeOf(f)
+}
+
+func (d *ydbDialect) insertBuilder(_ clause.Clause, builder clause.Builder) {
+	stmt, ok := builder.(*gorm.Statement)
+	if !ok {
+		return
+	}
+	if valuesClause, ok := stmt.Clauses["VALUES"].Expression.(clause.Values); ok {
+		// make params arg
+		rows := make([]types.Value, len(valuesClause.Values))
+		for i, row := range valuesClause.Values {
+			fields := make([]types.StructValueOption, len(row))
+			for j, v := range row {
+				fields[j] = types.StructFieldValue(valuesClause.Columns[j].Name, column.Value(v))
+			}
+			rows[i] = types.StructValue(fields...)
+		}
+		listValue := types.ListValue(rows...)
+
+		stmt.Vars = []interface{}{table.ValueParam("$values", listValue)}
+
+		// write DECLARE for param $values
+		_, _ = stmt.WriteString("DECLARE $values AS ")
+		_, _ = stmt.WriteString(listValue.Type().Yql())
+		_, _ = stmt.WriteString("; ")
+		// write INSERT statement
+		_, _ = stmt.WriteString("UPSERT INTO `")
+		_, _ = stmt.WriteString(d.fullTableName(stmt.Table))
+		_, _ = stmt.WriteString("` (")
+		for i, col := range valuesClause.Columns {
+			if i != 0 {
+				_ = stmt.WriteByte(',')
+			}
+			_, _ = stmt.WriteString("`")
+			_, _ = stmt.WriteString(col.Name)
+			_, _ = stmt.WriteString("`")
+		}
+		_, _ = stmt.WriteString(") SELECT ")
+		for i, col := range valuesClause.Columns {
+			if i != 0 {
+				_ = stmt.WriteByte(',')
+			}
+			_, _ = stmt.WriteString("`")
+			_, _ = stmt.WriteString(col.Name)
+			_, _ = stmt.WriteString("`")
+		}
+		_, _ = stmt.WriteString(" FROM AS_TABLE($values);")
+	}
+}
+
+func (d *ydbDialect) selectBuilder(c clause.Clause, builder clause.Builder) {
+	stmt, ok := builder.(*gorm.Statement)
+	if !ok {
+		return
+	}
+	b := builders.Get()
+	defer builders.Put(b)
+	selectClause, ok := c.Expression.(clause.Select)
+	if ok {
+		d.selectColumnsBuilder(stmt, b, selectClause)
+	}
+	if whereClause, ok := stmt.Clauses["WHERE"].Expression.(clause.Where); ok {
+		d.selectWhereBuilder(stmt, b, whereClause)
+	}
+	_, _ = stmt.WriteString(b.String())
+}
+
+func (d *ydbDialect) selectColumnsBuilder(stmt *gorm.Statement, b *strings.Builder, c clause.Select) {
+	_, _ = b.WriteString("SELECT ")
+	if len(c.Columns) > 0 {
+		for i, col := range c.Columns {
+			if i != 0 {
+				_ = b.WriteByte(',')
+			}
+			_, _ = b.WriteString("`")
+			_, _ = b.WriteString(col.Name)
+			_, _ = b.WriteString("`")
+		}
+	} else {
+		for i, col := range stmt.Schema.DBNames {
+			if i != 0 {
+				_ = b.WriteByte(',')
+			}
+			_, _ = b.WriteString("`")
+			_, _ = b.WriteString(col)
+			_, _ = b.WriteString("`")
+		}
+	}
+	_, _ = b.WriteString(" FROM `")
+	_, _ = b.WriteString(d.fullTableName(stmt.Schema.Table))
+	_, _ = b.WriteString("`")
+}
+
+func (d *ydbDialect) selectWhereBuilder(stmt *gorm.Statement, b *strings.Builder, c clause.Where) {
+	_, _ = b.WriteString(" WHERE ")
+	var params []table.ParameterOption
+	writeExpression := func(column interface{}, op string) (columnName string) {
+		switch c := column.(type) {
+		case clause.Column:
+			columnName = c.Name
+		case string:
+			columnName = c
+		default:
+			panic(fmt.Sprintf("unknown type of %+v", c))
+		}
+		_, _ = b.WriteString("`")
+		_, _ = b.WriteString(columnName)
+		_, _ = b.WriteString("`")
+		_, _ = b.WriteString(op)
+		columnName = "$arg" + strconv.Itoa(len(params))
+		_, _ = b.WriteString(columnName)
+		return columnName
+	}
+	for _, expr := range c.Exprs {
+		switch t := expr.(type) {
+		case clause.IN:
+			values := make([]types.Value, len(t.Values))
+			for i, in := range t.Values {
+				values[i] = column.Value(in)
+			}
+			params = append(params, table.ValueParam(writeExpression(t.Column, " IN "), types.ListValue(values...)))
+		case clause.Like:
+			params = append(params, table.ValueParam(writeExpression(t.Column, " LIKE "), column.Value(t.Value)))
+		case clause.Eq:
+			params = append(params, table.ValueParam(writeExpression(t.Column, "="), column.Value(t.Value)))
+		case clause.Neq:
+			params = append(params, table.ValueParam(writeExpression(t.Column, "!="), column.Value(t.Value)))
+		case clause.Gt:
+			params = append(params, table.ValueParam(writeExpression(t.Column, ">"), column.Value(t.Value)))
+		case clause.Gte:
+			params = append(params, table.ValueParam(writeExpression(t.Column, ">="), column.Value(t.Value)))
+		case clause.Lt:
+			params = append(params, table.ValueParam(writeExpression(t.Column, "<"), column.Value(t.Value)))
+		case clause.Lte:
+			params = append(params, table.ValueParam(writeExpression(t.Column, "<="), column.Value(t.Value)))
+		default:
+			panic(fmt.Sprintf("unknown type of %+v", expr))
+		}
+	}
+	declares, err := sugar.GenerateDeclareSection(params)
+	if err != nil {
+		_ = stmt.AddError(err)
+		return
+	}
+	_, _ = stmt.WriteString(strings.ReplaceAll(declares, "\n", " "))
+	for _, param := range params {
+		stmt.Vars = append(stmt.Vars, param)
+	}
 }
