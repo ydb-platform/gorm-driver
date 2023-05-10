@@ -5,7 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"gorm.io/gorm/schema"
 )
 
@@ -275,6 +278,192 @@ func Test_dropColumnQuery(t *testing.T) {
 			sql, err := d.dropColumnQuery(tt.model, tt.indexName)
 			require.NoError(t, err)
 			require.Equal(t, strings.ReplaceAll(strings.TrimSpace(tt.sql), "\"", "`"), sql)
+		})
+	}
+}
+
+func Test_selectBuilder(t *testing.T) {
+	d := &ydbDialect{}
+	for _, tt := range []struct {
+		testName      string
+		stmtClauses   map[string]clause.Clause
+		clause        clause.Clause
+		expectedQuery string
+	}{
+		{
+			testName: "SELECT clause only",
+			clause: clause.Clause{
+				Expression: clause.Select{
+					Columns: []clause.Column{
+						{Name: "id"},
+						{Name: "name"},
+						{Name: "lastname"},
+					},
+				},
+			},
+			expectedQuery: "SELECT `id`,`name`,`lastname` FROM `users`",
+		},
+		{
+			testName: "select with WHERE clauses",
+			stmtClauses: map[string]clause.Clause{
+				"WHERE": {
+					Expression: clause.Where{
+						Exprs: []clause.Expression{
+							clause.Eq{Column: "id", Value: int32(123)},
+						},
+					},
+				},
+			},
+			clause: clause.Clause{
+				Expression: clause.Select{
+					Columns: []clause.Column{
+						{Name: "name"},
+						{Name: "lastname"},
+					},
+				},
+			},
+			expectedQuery: "SELECT `name`,`lastname` FROM `users` WHERE `id` = $1",
+		},
+		{
+			testName: "where clause with AND condition",
+			stmtClauses: map[string]clause.Clause{
+				"WHERE": {
+					Expression: clause.Where{
+						Exprs: []clause.Expression{
+							clause.And(
+								clause.Eq{Column: "id", Value: int32(123)},
+								clause.Eq{Column: "id2", Value: int32(1234)},
+							),
+						},
+					},
+				},
+			},
+			clause: clause.Clause{
+				Expression: clause.Select{
+					Columns: []clause.Column{
+						{Name: "name"},
+						{Name: "lastname"},
+					},
+				},
+			},
+			expectedQuery: "SELECT `name`,`lastname` FROM `users` WHERE (`id` = $1 AND `id2` = $2)",
+		},
+		{
+			testName: "where clause with OR condition",
+			stmtClauses: map[string]clause.Clause{
+				"WHERE": {
+					Expression: clause.Where{
+						Exprs: []clause.Expression{
+							clause.Or(
+								clause.Eq{Column: "id", Value: int32(123)},
+								clause.Eq{Column: "id2", Value: int32(1234)},
+							),
+						},
+					},
+				},
+			},
+			clause: clause.Clause{
+				Expression: clause.Select{
+					Columns: []clause.Column{
+						{Name: "name"},
+						{Name: "lastname"},
+					},
+				},
+			},
+			expectedQuery: "SELECT `name`,`lastname` FROM `users` WHERE (`id` = $1 OR `id2` = $2)",
+		},
+		{
+			testName: "where clause with AND and OR condition",
+			stmtClauses: map[string]clause.Clause{
+				"WHERE": {
+					Expression: clause.Where{
+						Exprs: []clause.Expression{
+							clause.And(
+								clause.Eq{Column: "id", Value: int32(123)},
+								clause.Or(
+									clause.Eq{Column: "id2", Value: int32(1234)},
+									clause.Eq{Column: "id2", Value: int32(4321)},
+								),
+							),
+						},
+					},
+				},
+			},
+			clause: clause.Clause{
+				Expression: clause.Select{
+					Columns: []clause.Column{
+						{Name: "name"},
+						{Name: "lastname"},
+					},
+				},
+			},
+			expectedQuery: "SELECT `name`,`lastname` FROM `users` WHERE (`id` = $1 AND (`id2` = $2 OR `id2` = $3))",
+		},
+		{
+			testName: "where clause with NOT condition for Eq",
+			stmtClauses: map[string]clause.Clause{
+				"WHERE": {
+					Expression: clause.Where{
+						Exprs: []clause.Expression{
+							clause.Not(
+								clause.Eq{Column: "id", Value: int32(123)},
+							),
+						},
+					},
+				},
+			},
+			clause: clause.Clause{
+				Expression: clause.Select{
+					Columns: []clause.Column{
+						{Name: "name"},
+						{Name: "lastname"},
+					},
+				},
+			},
+			expectedQuery: "SELECT `name`,`lastname` FROM `users` WHERE `id` <> $1",
+		},
+		{
+			testName: "where clause with NOT condition for AND",
+			stmtClauses: map[string]clause.Clause{
+				"WHERE": {
+					Expression: clause.Where{
+						Exprs: []clause.Expression{
+							clause.Not(
+								clause.And(
+									clause.Eq{Column: "id", Value: int32(123)},
+									clause.Eq{Column: "id2", Value: int32(1234)},
+								),
+							),
+						},
+					},
+				},
+			},
+			clause: clause.Clause{
+				Expression: clause.Select{
+					Columns: []clause.Column{
+						{Name: "name"},
+						{Name: "lastname"},
+					},
+				},
+			},
+			expectedQuery: "SELECT `name`,`lastname` FROM `users` WHERE NOT (`id` = $1 AND `id2` = $2)",
+		},
+	} {
+		t.Run(tt.testName, func(t *testing.T) {
+			stmt := &gorm.Statement{
+				DB: &gorm.DB{
+					Config: &gorm.Config{
+						Dialector: d,
+					},
+				},
+				Schema: &schema.Schema{
+					Table: "users",
+				},
+				Clauses: tt.stmtClauses,
+			}
+			c := tt.clause
+			d.selectBuilder(c, clause.Builder(stmt))
+			assert.Equal(t, tt.expectedQuery, stmt.SQL.String())
 		})
 	}
 }
