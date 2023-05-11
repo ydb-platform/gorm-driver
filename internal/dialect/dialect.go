@@ -4,11 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
-	"fmt"
 	"math"
 	"path"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -615,7 +613,11 @@ func (d *ydbDialect) Initialize(db *gorm.DB) (err error) {
 
 	if db.ConnPool == nil {
 		var connector driver.Connector
-		connector, err = ydb.Connector(d.db)
+		connector, err = ydb.Connector(d.db,
+			ydb.WithTablePathPrefix(d.tablePathPrefix),
+			ydb.WithAutoDeclare(),
+			ydb.WithNumericArgs(),
+		)
 		if err != nil {
 			return err
 		}
@@ -790,96 +792,47 @@ func (d *ydbDialect) selectBuilder(c clause.Clause, builder clause.Builder) {
 	if !ok {
 		return
 	}
-	b := builders.Get()
-	defer builders.Put(b)
 	selectClause, ok := c.Expression.(clause.Select)
 	if ok {
-		d.selectColumnsBuilder(stmt, b, selectClause)
+		d.selectColumnsBuilder(stmt, selectClause)
 	}
 	if whereClause, ok := stmt.Clauses["WHERE"].Expression.(clause.Where); ok {
-		d.selectWhereBuilder(stmt, b, whereClause)
+		d.selectWhereBuilder(stmt, whereClause)
 	}
-	_, _ = stmt.WriteString(b.String())
 }
 
-func (d *ydbDialect) selectColumnsBuilder(stmt *gorm.Statement, b *strings.Builder, c clause.Select) {
-	_, _ = b.WriteString("SELECT ")
+func (d *ydbDialect) selectColumnsBuilder(stmt *gorm.Statement, c clause.Select) {
+	_, _ = stmt.SQL.WriteString("SELECT ")
 	if len(c.Columns) > 0 {
 		for i, col := range c.Columns {
 			if i != 0 {
-				_ = b.WriteByte(',')
+				_ = stmt.SQL.WriteByte(',')
 			}
-			_, _ = b.WriteString("`")
-			_, _ = b.WriteString(col.Name)
-			_, _ = b.WriteString("`")
+			_, _ = stmt.SQL.WriteString("`")
+			_, _ = stmt.SQL.WriteString(col.Name)
+			_, _ = stmt.SQL.WriteString("`")
 		}
 	} else {
 		for i, col := range stmt.Schema.DBNames {
 			if i != 0 {
-				_ = b.WriteByte(',')
+				_ = stmt.SQL.WriteByte(',')
 			}
-			_, _ = b.WriteString("`")
-			_, _ = b.WriteString(col)
-			_, _ = b.WriteString("`")
+			_, _ = stmt.SQL.WriteString("`")
+			_, _ = stmt.SQL.WriteString(col)
+			_, _ = stmt.SQL.WriteString("`")
 		}
 	}
-	_, _ = b.WriteString(" FROM `")
-	_, _ = b.WriteString(d.fullTableName(stmt.Schema.Table))
-	_, _ = b.WriteString("`")
+	_, _ = stmt.SQL.WriteString(" FROM `")
+	_, _ = stmt.SQL.WriteString(d.fullTableName(stmt.Schema.Table))
+	_, _ = stmt.SQL.WriteString("`")
 }
 
-func (d *ydbDialect) selectWhereBuilder(stmt *gorm.Statement, b *strings.Builder, c clause.Where) {
-	_, _ = b.WriteString(" WHERE ")
+func (d *ydbDialect) selectWhereBuilder(stmt *gorm.Statement, c clause.Where) {
+	_, _ = stmt.SQL.WriteString(" WHERE ")
 	var params []table.ParameterOption
-	writeExpression := func(column interface{}, op string) (columnName string) {
-		switch c := column.(type) {
-		case clause.Column:
-			columnName = c.Name
-		case string:
-			columnName = c
-		default:
-			panic(fmt.Sprintf("unknown type of %+v", c))
-		}
-		_, _ = b.WriteString("`")
-		_, _ = b.WriteString(columnName)
-		_, _ = b.WriteString("`")
-		_, _ = b.WriteString(op)
-		columnName = "$arg" + strconv.Itoa(len(params))
-		_, _ = b.WriteString(columnName)
-		return columnName
-	}
 	for _, expr := range c.Exprs {
-		switch t := expr.(type) {
-		case clause.IN:
-			values := make([]types.Value, len(t.Values))
-			for i, in := range t.Values {
-				values[i] = column.Value(in)
-			}
-			params = append(params, table.ValueParam(writeExpression(t.Column, " IN "), types.ListValue(values...)))
-		case clause.Like:
-			params = append(params, table.ValueParam(writeExpression(t.Column, " LIKE "), column.Value(t.Value)))
-		case clause.Eq:
-			params = append(params, table.ValueParam(writeExpression(t.Column, "="), column.Value(t.Value)))
-		case clause.Neq:
-			params = append(params, table.ValueParam(writeExpression(t.Column, "!="), column.Value(t.Value)))
-		case clause.Gt:
-			params = append(params, table.ValueParam(writeExpression(t.Column, ">"), column.Value(t.Value)))
-		case clause.Gte:
-			params = append(params, table.ValueParam(writeExpression(t.Column, ">="), column.Value(t.Value)))
-		case clause.Lt:
-			params = append(params, table.ValueParam(writeExpression(t.Column, "<"), column.Value(t.Value)))
-		case clause.Lte:
-			params = append(params, table.ValueParam(writeExpression(t.Column, "<="), column.Value(t.Value)))
-		default:
-			panic(fmt.Sprintf("unknown type of %+v", expr))
-		}
+		expr.Build(stmt)
 	}
-	declares, err := sugar.GenerateDeclareSection(params)
-	if err != nil {
-		_ = stmt.AddError(err)
-		return
-	}
-	_, _ = stmt.WriteString(strings.ReplaceAll(declares, "\n", " "))
 	for _, param := range params {
 		stmt.Vars = append(stmt.Vars, param)
 	}
