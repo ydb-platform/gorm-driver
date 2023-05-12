@@ -761,12 +761,8 @@ func (d *ydbDialect) insertBuilder(_ clause.Clause, builder clause.Builder) {
 		}
 		listValue := types.ListValue(rows...)
 
-		stmt.Vars = []interface{}{table.ValueParam("$values", listValue)}
+		stmt.Vars = []interface{}{listValue}
 
-		// write DECLARE for param $values
-		_, _ = stmt.WriteString("DECLARE $values AS ")
-		_, _ = stmt.WriteString(listValue.Type().Yql())
-		_, _ = stmt.WriteString("; ")
 		// write INSERT statement
 		_, _ = stmt.WriteString("UPSERT INTO `")
 		_, _ = stmt.WriteString(d.fullTableName(stmt.Table))
@@ -788,7 +784,7 @@ func (d *ydbDialect) insertBuilder(_ clause.Clause, builder clause.Builder) {
 			_, _ = stmt.WriteString(col.Name)
 			_, _ = stmt.WriteString("`")
 		}
-		_, _ = stmt.WriteString(" FROM AS_TABLE($values);")
+		_, _ = stmt.WriteString(" FROM AS_TABLE($1);")
 	}
 }
 
@@ -829,6 +825,8 @@ func (d *ydbDialect) selectColumnsBuilder(stmt *gorm.Statement, c clause.Select)
 	}
 	_, _ = stmt.SQL.WriteString(" FROM `")
 	_, _ = stmt.SQL.WriteString(d.fullTableName(stmt.Schema.Table))
+	_, _ = stmt.SQL.WriteString("` AS `")
+	_, _ = stmt.SQL.WriteString(stmt.Schema.Table)
 	_, _ = stmt.SQL.WriteString("`")
 }
 
