@@ -301,7 +301,7 @@ func Test_selectBuilder(t *testing.T) {
 					},
 				},
 			},
-			expectedQuery: "SELECT `id`,`name`,`lastname` FROM `users`",
+			expectedQuery: "SELECT `id`,`name`,`lastname` FROM `users` AS `users`",
 		},
 		{
 			testName: "select with WHERE clauses",
@@ -322,7 +322,7 @@ func Test_selectBuilder(t *testing.T) {
 					},
 				},
 			},
-			expectedQuery: "SELECT `name`,`lastname` FROM `users` WHERE `id` = $1",
+			expectedQuery: "SELECT `name`,`lastname` FROM `users` AS `users` WHERE `id` = $1",
 		},
 		{
 			testName: "where clause with AND condition",
@@ -346,7 +346,7 @@ func Test_selectBuilder(t *testing.T) {
 					},
 				},
 			},
-			expectedQuery: "SELECT `name`,`lastname` FROM `users` WHERE (`id` = $1 AND `id2` = $2)",
+			expectedQuery: "SELECT `name`,`lastname` FROM `users` AS `users` WHERE (`id` = $1 AND `id2` = $2)",
 		},
 		{
 			testName: "where clause with OR condition",
@@ -370,7 +370,7 @@ func Test_selectBuilder(t *testing.T) {
 					},
 				},
 			},
-			expectedQuery: "SELECT `name`,`lastname` FROM `users` WHERE (`id` = $1 OR `id2` = $2)",
+			expectedQuery: "SELECT `name`,`lastname` FROM `users` AS `users` WHERE (`id` = $1 OR `id2` = $2)",
 		},
 		{
 			testName: "where clause with AND and OR condition",
@@ -397,7 +397,7 @@ func Test_selectBuilder(t *testing.T) {
 					},
 				},
 			},
-			expectedQuery: "SELECT `name`,`lastname` FROM `users` WHERE (`id` = $1 AND (`id2` = $2 OR `id2` = $3))",
+			expectedQuery: "SELECT `name`,`lastname` FROM `users` AS `users` WHERE (`id` = $1 AND (`id2` = $2 OR `id2` = $3))",
 		},
 		{
 			testName: "where clause with NOT condition for Eq",
@@ -420,7 +420,7 @@ func Test_selectBuilder(t *testing.T) {
 					},
 				},
 			},
-			expectedQuery: "SELECT `name`,`lastname` FROM `users` WHERE `id` <> $1",
+			expectedQuery: "SELECT `name`,`lastname` FROM `users` AS `users` WHERE `id` <> $1",
 		},
 		{
 			testName: "where clause with NOT condition for AND",
@@ -446,7 +446,7 @@ func Test_selectBuilder(t *testing.T) {
 					},
 				},
 			},
-			expectedQuery: "SELECT `name`,`lastname` FROM `users` WHERE NOT (`id` = $1 AND `id2` = $2)",
+			expectedQuery: "SELECT `name`,`lastname` FROM `users` AS `users` WHERE NOT (`id` = $1 AND `id2` = $2)",
 		},
 	} {
 		t.Run(tt.testName, func(t *testing.T) {
