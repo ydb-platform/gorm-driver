@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/stretchr/testify v1.8.2
 	github.com/ydb-platform/ydb-go-sdk/v3 v3.46.0
-	gorm.io/gorm v1.24.5
+	gorm.io/gorm v1.25.1
 )
 
 require (
@@ -14,7 +14,7 @@ require (
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
-	github.com/jinzhu/now v1.1.4 // indirect
+	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/jonboulle/clockwork v0.3.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/ydb-platform/ydb-go-genproto v0.0.0-20221215182650-986f9d10542f // indirect

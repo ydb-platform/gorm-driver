@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"errors"
 	"math"
 	"path"
 	"strconv"
@@ -276,6 +277,10 @@ func (d *ydbDialect) listTables(absPath string) (tableList []string, err error) 
 
 func (d *ydbDialect) GetTables() (tableList []string, err error) {
 	return d.listTables(d.tablePathPrefix)
+}
+
+func (d *ydbDialect) TableType(dst interface{}) (gorm.TableType, error) {
+	return nil, errors.New("not support")
 }
 
 func (d *ydbDialect) addColumnQuery(model interface{}, columnName string) (_ string, err error) {
