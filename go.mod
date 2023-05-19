@@ -3,7 +3,7 @@ module github.com/ydb-platform/gorm-driver
 go 1.18
 
 require (
-	github.com/stretchr/testify v1.8.2
+	github.com/stretchr/testify v1.8.3
 	github.com/ydb-platform/ydb-go-sdk/v3 v3.47.1
 	gorm.io/gorm v1.25.1
 )
