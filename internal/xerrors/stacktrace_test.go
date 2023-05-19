@@ -8,27 +8,27 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestStackTraceError(t *testing.T) {
+func TestStacktraceError(t *testing.T) {
 	for _, test := range []struct {
 		error error
 		text  string
 	}{
 		{
-			error: WithStackTrace(fmt.Errorf("fmt.Errorf")),
+			error: WithStacktrace(fmt.Errorf("fmt.Errorf")),
 			//nolint:lll
-			text: "fmt.Errorf at `github.com/ydb-platform/gorm-driver/internal/xerrors.TestStackTraceError(stacktrace_test.go:17)`",
+			text: "fmt.Errorf at `github.com/ydb-platform/gorm-driver/internal/xerrors.TestStacktraceError(stacktrace_test.go:17)`",
 		},
 		{
-			error: WithStackTrace(fmt.Errorf("fmt.Errorf %s", "Printf")),
+			error: WithStacktrace(fmt.Errorf("fmt.Errorf %s", "Printf")),
 			//nolint:lll
-			text: "fmt.Errorf Printf at `github.com/ydb-platform/gorm-driver/internal/xerrors.TestStackTraceError(stacktrace_test.go:22)`",
+			text: "fmt.Errorf Printf at `github.com/ydb-platform/gorm-driver/internal/xerrors.TestStacktraceError(stacktrace_test.go:22)`",
 		},
 		{
-			error: WithStackTrace(
-				WithStackTrace(errors.New("errors.New")),
+			error: WithStacktrace(
+				WithStacktrace(errors.New("errors.New")),
 			),
 			//nolint:lll
-			text: "errors.New at `github.com/ydb-platform/gorm-driver/internal/xerrors.TestStackTraceError(stacktrace_test.go:28)` at `github.com/ydb-platform/gorm-driver/internal/xerrors.TestStackTraceError(stacktrace_test.go:27)`",
+			text: "errors.New at `github.com/ydb-platform/gorm-driver/internal/xerrors.TestStacktraceError(stacktrace_test.go:28)` at `github.com/ydb-platform/gorm-driver/internal/xerrors.TestStacktraceError(stacktrace_test.go:27)`",
 		},
 	} {
 		t.Run(test.text, func(t *testing.T) {

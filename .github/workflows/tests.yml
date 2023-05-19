@@ -62,7 +62,7 @@ jobs:
       OS: ${{ matrix.os }}-latest
       GO: ${{ matrix.go-version }}
       YDB_CONNECTION_STRING: grpc://localhost:2136/local
-      YDB_SSL_ROOT_CERTIFICATES_FILE: /tmp/ydb_certs/ca.pem
+      YDB_ANONYMOUS_CREDENTIALS: 1
     steps:
       - name: Checkout code
         uses: actions/checkout@v3

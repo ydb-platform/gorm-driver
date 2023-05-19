@@ -6,18 +6,18 @@ import (
 	"strings"
 )
 
-// WithStackTrace is a wrapper over original err with file:line identification
-func WithStackTrace(err error) error {
+// WithStacktrace is a wrapper over original err with file:line identification
+func WithStacktrace(err error) error {
 	if err == nil {
 		return nil
 	}
 	return &stackError{
-		stackRecord: StackRecord(1),
+		stackRecord: stackRecord(1),
 		err:         err,
 	}
 }
 
-func StackRecord(depth int) string {
+func stackRecord(depth int) string {
 	function, file, line, _ := runtime.Caller(depth + 1)
 	name := runtime.FuncForPC(function).Name()
 	return name + "(" + fileName(file) + ":" + strconv.Itoa(line) + ")"
