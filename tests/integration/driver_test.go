@@ -1,8 +1,7 @@
-//go:build integration
-
-package ydb_test
+package integration
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -13,7 +12,7 @@ import (
 )
 
 type Product struct {
-	gorm.Model
+	ID    uint `gorm:"primarykey;not null;autoIncrement:false"`
 	Code  string
 	Price uint
 }
@@ -28,12 +27,16 @@ func TestDriver(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, db)
 
+	db = db.Debug()
+
+	_ = db.Migrator().DropTable(&Product{})
+
 	// Migrate the schema
 	err = db.AutoMigrate(&Product{})
 	require.NoError(t, err)
 
 	// Create
-	err = db.Create(&Product{Code: "D42", Price: 100}).Error
+	err = db.Create(&Product{ID: 1, Code: "D42", Price: 100}).Error
 	require.NoError(t, err)
 
 	// Read
@@ -41,8 +44,12 @@ func TestDriver(t *testing.T) {
 	err = db.First(&product, 1).Error // find product with integer primary key
 	require.NoError(t, err)
 
+	fmt.Printf("%+v\n", product)
+
 	err = db.First(&product, "code = ?", "D42").Error // find product with code D42
 	require.NoError(t, err)
+
+	fmt.Printf("%+v\n", product)
 
 	// Update - update product's price to 200
 	err = db.Model(&product).Update("Price", 200).Error
