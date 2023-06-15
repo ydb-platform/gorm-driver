@@ -238,6 +238,25 @@ func (m Migrator) HasTable(model interface{}) bool {
 	return exists
 }
 
+// ColumnTypes return columnTypes []gorm.ColumnType and execErr error
+func (m Migrator) ColumnTypes(value interface{}) ([]gorm.ColumnType, error) {
+	columnTypes := make([]gorm.ColumnType, 0)
+	execErr := m.RunWithValue(value, func(stmt *gorm.Statement) (err error) {
+		var ct gorm.ColumnType
+		for _, f := range stmt.Schema.Fields {
+			ct, _, err = Type(f)
+			if err != nil {
+				return err
+			}
+			columnTypes = append(columnTypes, ct)
+		}
+
+		return
+	})
+
+	return columnTypes, execErr
+}
+
 func (m Migrator) schemaByValue(model interface{}) (*schema.Schema, error) {
 	s, err := schema.Parse(model, m.cacheStore, m.DB.NamingStrategy)
 	if err != nil {
