@@ -11,13 +11,13 @@ import (
 	ydb "github.com/ydb-platform/gorm-driver"
 )
 
-type Product struct {
-	ID    uint `gorm:"primarykey;not null;autoIncrement:false"`
-	Code  string
-	Price uint
-}
-
 func TestDriver(t *testing.T) {
+	type Product struct {
+		ID    uint `gorm:"primarykey;not null;autoIncrement:false"`
+		Code  string
+		Price uint
+	}
+
 	dsn, has := os.LookupEnv("YDB_CONNECTION_STRING")
 	if !has {
 		t.Skip("skip test '" + t.Name() + "' without env 'YDB_CONNECTION_STRING'")
@@ -28,8 +28,6 @@ func TestDriver(t *testing.T) {
 	require.NotNil(t, db)
 
 	db = db.Debug()
-
-	_ = db.Migrator().DropTable(&Product{})
 
 	// Migrate the schema
 	err = db.AutoMigrate(&Product{})
