@@ -129,7 +129,49 @@ func (d Dialector) Initialize(db *gorm.DB) error {
 		LastInsertIDReversed: true,
 	})
 
+	for k, v := range d.ClauseBuilders() {
+		db.ClauseBuilders[k] = v
+	}
+
 	return nil
+}
+
+func (d Dialector) ClauseBuilders() map[string]clause.ClauseBuilder {
+	return map[string]clause.ClauseBuilder{
+		"INSERT": func(c clause.Clause, builder clause.Builder) {
+			insert, ok := c.Expression.(clause.Insert)
+			if !ok {
+				c.Build(builder)
+				return
+			}
+
+			stmt, ok := builder.(*gorm.Statement)
+			if !ok {
+				c.Build(builder)
+				return
+			}
+
+			_, err := stmt.WriteString("UPSERT ")
+			d.checkAndAddError(stmt, err)
+
+			if insert.Modifier != "" {
+				_, err = stmt.WriteString(insert.Modifier)
+				d.checkAndAddError(stmt, err)
+
+				err = stmt.WriteByte(' ')
+				d.checkAndAddError(stmt, err)
+			}
+
+			_, err = stmt.WriteString("INTO ")
+			d.checkAndAddError(stmt, err)
+
+			if insert.Table.Name == "" {
+				stmt.WriteQuoted(stmt.Table)
+			} else {
+				stmt.WriteQuoted(insert.Table)
+			}
+		},
+	}
 }
 
 func (d Dialector) Migrator(db *gorm.DB) gorm.Migrator {
@@ -169,8 +211,11 @@ func (d Dialector) DefaultValueOf(field *schema.Field) clause.Expression {
 }
 
 func (d Dialector) BindVarTo(writer clause.Writer, stmt *gorm.Statement, v interface{}) {
-	_ = writer.WriteByte('$')
-	_, _ = writer.WriteString(strconv.Itoa(len(stmt.Vars)))
+	err := writer.WriteByte('$')
+	d.checkAndAddError(stmt, err)
+
+	_, err = writer.WriteString(strconv.Itoa(len(stmt.Vars)))
+	d.checkAndAddError(stmt, err)
 }
 
 func (d Dialector) QuoteTo(writer clause.Writer, s string) {
@@ -223,4 +268,10 @@ func (d Dialector) QuoteTo(writer clause.Writer, s string) {
 
 func (d Dialector) Explain(sql string, vars ...interface{}) string {
 	return logger.ExplainSQL(sql, nil, `'`, vars...)
+}
+
+func (d Dialector) checkAndAddError(stmt *gorm.Statement, err error) {
+	if err != nil {
+		_ = stmt.AddError(err)
+	}
 }
