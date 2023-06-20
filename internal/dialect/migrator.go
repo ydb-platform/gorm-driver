@@ -2,6 +2,7 @@ package dialect
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"path"
@@ -10,6 +11,8 @@ import (
 
 	ydbDriver "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"gorm.io/gorm/migrator"
@@ -238,17 +241,92 @@ func (m Migrator) HasTable(model interface{}) bool {
 	return exists
 }
 
+// AddColumn create `name` column for value
+func (m Migrator) AddColumn(value interface{}, name string) error {
+	return m.RunWithValue(value, func(stmt *gorm.Statement) error {
+		// avoid using the same name field
+		f := stmt.Schema.LookUpField(name)
+		if f == nil {
+			return fmt.Errorf("failed to look up field with name: %s", name)
+		}
+
+		if !f.IgnoreMigration {
+			return m.DB.WithContext(ydbDriver.WithQueryMode(context.Background(), ydbDriver.SchemeQueryMode)).Exec(
+				"ALTER TABLE ? ADD ? ?",
+				m.CurrentTable(stmt), clause.Column{Name: f.DBName}, m.DB.Migrator().FullDataTypeOf(f),
+			).Error
+		}
+
+		return nil
+	})
+}
+
+// DropColumn drop value's `name` column
+func (m Migrator) DropColumn(value interface{}, name string) error {
+	return m.RunWithValue(value, func(stmt *gorm.Statement) error {
+		if field := stmt.Schema.LookUpField(name); field != nil {
+			name = field.DBName
+		}
+
+		return m.DB.WithContext(ydbDriver.WithQueryMode(context.Background(), ydbDriver.SchemeQueryMode)).Exec(
+			"ALTER TABLE ? DROP COLUMN ?", m.CurrentTable(stmt), clause.Column{Name: name},
+		).Error
+	})
+}
+
+// AlterColumn alter value's `field` column type based on schema definition
+func (m Migrator) AlterColumn(value interface{}, field string) error {
+	return xerrors.WithStacktrace(fmt.Errorf("field `%s`: alter column not supported", field))
+}
+
 // ColumnTypes return columnTypes []gorm.ColumnType and execErr error
 func (m Migrator) ColumnTypes(value interface{}) ([]gorm.ColumnType, error) {
+	s, err := m.schemaByValue(value)
+	if err != nil {
+		return nil, err
+	}
+	tableName := s.Table
+
 	columnTypes := make([]gorm.ColumnType, 0)
 	execErr := m.RunWithValue(value, func(stmt *gorm.Statement) (err error) {
+		var db *sql.DB
+		db, err = m.DB.DB()
+		if err != nil {
+			return err
+		}
+
+		var cc *ydbDriver.Driver
+		cc, err = ydbDriver.Unwrap(db)
+		if err != nil {
+			return err
+		}
+
+		pt := m.fullTableName(tableName)
+
+		var desc options.Description
+		err = cc.Table().Do(context.TODO(), func(ctx context.Context, s table.Session) (err error) {
+			desc, err = s.DescribeTable(ctx, pt)
+			return err
+		}, table.WithIdempotent())
+		if err != nil {
+			return fmt.Errorf("describe '%s' failed: %w", pt, err)
+		}
+
 		var ct gorm.ColumnType
+	field:
 		for _, f := range stmt.Schema.Fields {
-			ct, _, err = Type(f)
-			if err != nil {
-				return err
+			for _, column := range desc.Columns {
+				if f.DBName == column.Name {
+					ct, _, err = TypeByYdbType(f, column.Type)
+					if err != nil {
+						return err
+					}
+
+					columnTypes = append(columnTypes, ct)
+
+					continue field
+				}
 			}
-			columnTypes = append(columnTypes, ct)
 		}
 
 		return

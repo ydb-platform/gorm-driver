@@ -15,6 +15,12 @@ import (
 type TypeByYdbTypeOption func(columnType *migrator.ColumnType)
 
 func TypeByYdbType(f *schema.Field, t types.Type, opts ...TypeByYdbTypeOption) (gorm.ColumnType, types.Type, error) {
+	isOptional, innerType := types.IsOptional(t)
+	for isOptional {
+		t = innerType
+		isOptional, innerType = types.IsOptional(t)
+	}
+
 	columnType := migrator.ColumnType{
 		NameValue: sql.NullString{
 			String: f.DBName,
