@@ -33,13 +33,11 @@ func (m Migrator) FullDataTypeOf(field *schema.Field) (expr clause.Expr) {
 	if field.NotNull {
 		if !field.PrimaryKey {
 			//nolint:godox
-			// TODO: remove panic after support NOT NULL for non-PrimaryKey columns
+			// TODO: implement after support NOT NULL for non-PrimaryKey columns
 			panic(
-				xerrors.WithStacktrace(
-					fmt.Errorf("model %s, table %s: not null supported only for PrimaryKey in ydb",
-						field.Schema.Name,
-						field.Name,
-					),
+				fmt.Sprintf("model %s, table %s: not null supported only for PrimaryKey in ydb",
+					field.Schema.Name,
+					field.Name,
 				),
 			)
 		}
@@ -49,27 +47,13 @@ func (m Migrator) FullDataTypeOf(field *schema.Field) (expr clause.Expr) {
 	if field.Unique {
 		//nolint:godox
 		// TODO: implement after support UNIQUE constraint on server side
-		panic(
-			xerrors.WithStacktrace(
-				fmt.Errorf("model %s, table %s: UNIQUE is not supported in ydb",
-					field.Schema.Name,
-					field.Name,
-				),
-			),
-		)
+		panic(fmt.Sprintf("model %s, table %s: UNIQUE is not supported in ydb", field.Schema.Name, field.Name))
 	}
 
 	if field.HasDefaultValue && (field.DefaultValueInterface != nil || field.DefaultValue != "") {
 		//nolint:godox
 		// TODO: implement after support DEFAULT in ydb
-		panic(
-			xerrors.WithStacktrace(
-				fmt.Errorf("model %s, table %s: DEFAULT is not supported in ydb",
-					field.Schema.Name,
-					field.Name,
-				),
-			),
-		)
+		panic(fmt.Sprintf("model %s, table %s: DEFAULT is not supported in ydb", field.Schema.Name, field.Name))
 	}
 
 	return expr

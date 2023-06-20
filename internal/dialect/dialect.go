@@ -79,9 +79,7 @@ func New(dsn string, opts ...Option) *Dialector {
 }
 
 func (d Dialector) Name() string {
-	//nolint:godox
-	// TODO implement me
-	panic("implement me")
+	return "ydb"
 }
 
 func (d Dialector) Initialize(db *gorm.DB) error {
@@ -191,23 +189,15 @@ func (d Dialector) Migrator(db *gorm.DB) gorm.Migrator {
 func (d Dialector) DataTypeOf(field *schema.Field) string {
 	t, _, err := Type(field)
 	if err != nil {
-		panic(
-			xerrors.WithStacktrace(
-				fmt.Errorf("error getting field (model %s, field %s) type: %w",
-					field.Schema.Name,
-					field.Name,
-					err,
-				),
-			),
-		)
+		panic(fmt.Errorf("error getting field (model %s, field %s) type: %w", field.Schema.Name, field.Name, err))
 	}
 	return t.DatabaseTypeName()
 }
 
 func (d Dialector) DefaultValueOf(field *schema.Field) clause.Expression {
 	//nolint:godox
-	// TODO implement me
-	panic("implement me")
+	// TODO: implement after support DEFAULT in ydb
+	panic("DEFAULT in not supported in ydb")
 }
 
 func (d Dialector) BindVarTo(writer clause.Writer, stmt *gorm.Statement, v interface{}) {
