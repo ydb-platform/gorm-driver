@@ -60,13 +60,16 @@ func (m Migrator) FullDataTypeOf(field *schema.Field) (expr clause.Expr) {
 	}
 
 	if field.HasDefaultValue && (field.DefaultValueInterface != nil || field.DefaultValue != "") {
-		if field.DefaultValueInterface != nil {
-			defaultStmt := &gorm.Statement{Vars: []interface{}{field.DefaultValueInterface}}
-			m.Dialector.BindVarTo(defaultStmt, defaultStmt, field.DefaultValueInterface)
-			expr.SQL += " DEFAULT " + m.Dialector.Explain(defaultStmt.SQL.String(), field.DefaultValueInterface)
-		} else if field.DefaultValue != "(-)" {
-			expr.SQL += " DEFAULT " + field.DefaultValue
-		}
+		//nolint:godox
+		// TODO: implement after support DEFAULT in ydb
+		panic(
+			xerrors.WithStacktrace(
+				fmt.Errorf("model %s, table %s: DEFAULT is not supported in ydb",
+					field.Schema.Name,
+					field.Name,
+				),
+			),
+		)
 	}
 
 	return expr
