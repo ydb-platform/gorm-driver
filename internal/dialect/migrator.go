@@ -276,6 +276,10 @@ func (m Migrator) ColumnTypes(value interface{}) ([]gorm.ColumnType, error) {
 
 	columnTypes := make([]gorm.ColumnType, 0)
 	execErr := m.RunWithValue(value, func(stmt *gorm.Statement) (err error) {
+		if stmt.Context == nil {
+			stmt.Context = context.Background()
+		}
+
 		var db *sql.DB
 		db, err = m.DB.DB()
 		if err != nil {
@@ -291,7 +295,7 @@ func (m Migrator) ColumnTypes(value interface{}) ([]gorm.ColumnType, error) {
 		pt := m.fullTableName(tableName)
 
 		var desc options.Description
-		err = cc.Table().Do(context.TODO(), func(ctx context.Context, s table.Session) (err error) {
+		err = cc.Table().Do(stmt.Context, func(ctx context.Context, s table.Session) (err error) {
 			desc, err = s.DescribeTable(ctx, pt)
 			return err
 		}, table.WithIdempotent())

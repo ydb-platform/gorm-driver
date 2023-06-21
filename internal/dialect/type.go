@@ -15,8 +15,10 @@ import (
 type TypeByYdbTypeOption func(columnType *migrator.ColumnType)
 
 func TypeByYdbType(f *schema.Field, t types.Type, opts ...TypeByYdbTypeOption) (gorm.ColumnType, types.Type, error) {
+	nullable := false
 	isOptional, innerType := types.IsOptional(t)
 	for isOptional {
+		nullable = true
 		t = innerType
 		isOptional, innerType = types.IsOptional(t)
 	}
@@ -39,7 +41,7 @@ func TypeByYdbType(f *schema.Field, t types.Type, opts ...TypeByYdbTypeOption) (
 			Valid: true,
 		},
 		NullableValue: sql.NullBool{
-			Bool:  true,
+			Bool:  nullable,
 			Valid: true,
 		},
 		LengthValue: sql.NullInt64{
