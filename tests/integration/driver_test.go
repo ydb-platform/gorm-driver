@@ -23,7 +23,11 @@ func TestDriver(t *testing.T) {
 		t.Skip("skip test '" + t.Name() + "' without env 'YDB_CONNECTION_STRING'")
 	}
 
-	db, err := gorm.Open(ydb.Open(dsn))
+	db, err := gorm.Open(
+		ydb.Open(dsn,
+			ydb.WithTablePathPrefix(t.Name()),
+		),
+	)
 	require.NoError(t, err)
 	require.NotNil(t, db)
 
