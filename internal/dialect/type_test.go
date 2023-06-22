@@ -4,12 +4,10 @@ import (
 	"database/sql"
 	"testing"
 
-	"gorm.io/gorm/migrator"
-
 	"github.com/google/uuid"
-
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
+	"gorm.io/gorm/migrator"
 	"gorm.io/gorm/schema"
 )
 
