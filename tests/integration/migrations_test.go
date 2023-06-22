@@ -1,10 +1,16 @@
 package integration
 
 import (
+	"context"
+	"fmt"
 	"os"
+	"path"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	ydbDriver "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"gorm.io/gorm"
 
@@ -223,4 +229,61 @@ func TestMigrateColumn(t *testing.T) {
 		hasTable := db.Migrator().HasTable(new(migrationsTable))
 		require.False(t, hasTable)
 	})
+}
+
+func TestCreateTableWithOptions(t *testing.T) {
+	partitionSize := uint64(100)
+	minPartitionsCount := uint64(1)
+	maxPartitionsCount := uint64(10)
+
+	tableOptions := fmt.Sprintf(`WITH (
+		AUTO_PARTITIONING_BY_SIZE = ENABLED,
+		AUTO_PARTITIONING_BY_LOAD = ENABLED,
+		AUTO_PARTITIONING_PARTITION_SIZE_MB = %d,
+		AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = %d,
+		AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = %d
+	)`, partitionSize, minPartitionsCount, maxPartitionsCount)
+
+	type Product struct {
+		ID    uint `gorm:"primarykey;not null;autoIncrement:false"`
+		Code  string
+		Price uint
+	}
+
+	dsn, has := os.LookupEnv("YDB_CONNECTION_STRING")
+	if !has {
+		t.Skip("skip test '" + t.Name() + "' without env 'YDB_CONNECTION_STRING'")
+	}
+
+	db, err := gorm.Open(
+		ydb.Open(dsn,
+			ydb.WithTablePathPrefix(t.Name()),
+		),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, db)
+
+	db = db.Debug()
+
+	err = db.Set("gorm:table_options", tableOptions).AutoMigrate(&Product{})
+	require.NoError(t, err)
+
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+
+	driver, err := ydbDriver.Unwrap(sqlDB)
+	require.NoError(t, err)
+
+	var desc options.Description
+	err = driver.Table().Do(context.Background(), func(ctx context.Context, s table.Session) (err error) {
+		desc, err = s.DescribeTable(ctx, path.Join(driver.Name(), t.Name(), "products"))
+		return err
+	}, table.WithIdempotent())
+	require.NoError(t, err)
+
+	require.Equal(t, options.FeatureEnabled, desc.PartitioningSettings.PartitioningBySize)
+	require.Equal(t, options.FeatureEnabled, desc.PartitioningSettings.PartitioningByLoad)
+	require.Equal(t, partitionSize, desc.PartitioningSettings.PartitionSizeMb)
+	require.Equal(t, minPartitionsCount, desc.PartitioningSettings.MinPartitionsCount)
+	require.Equal(t, maxPartitionsCount, desc.PartitioningSettings.MaxPartitionsCount)
 }
