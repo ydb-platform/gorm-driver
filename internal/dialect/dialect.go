@@ -150,18 +150,18 @@ func (d Dialector) ClauseBuilders() map[string]clause.ClauseBuilder {
 			}
 
 			_, err := stmt.WriteString("UPSERT ")
-			d.checkAndAddError(stmt, err)
+			checkAndAddError(stmt, err)
 
 			if insert.Modifier != "" {
 				_, err = stmt.WriteString(insert.Modifier)
-				d.checkAndAddError(stmt, err)
+				checkAndAddError(stmt, err)
 
 				err = stmt.WriteByte(' ')
-				d.checkAndAddError(stmt, err)
+				checkAndAddError(stmt, err)
 			}
 
 			_, err = stmt.WriteString("INTO ")
-			d.checkAndAddError(stmt, err)
+			checkAndAddError(stmt, err)
 
 			if insert.Table.Name == "" {
 				stmt.WriteQuoted(stmt.Table)
@@ -202,10 +202,10 @@ func (d Dialector) DefaultValueOf(_ *schema.Field) clause.Expression {
 
 func (d Dialector) BindVarTo(writer clause.Writer, stmt *gorm.Statement, _ interface{}) {
 	err := writer.WriteByte('$')
-	d.checkAndAddError(stmt, err)
+	checkAndAddError(stmt, err)
 
 	_, err = writer.WriteString(strconv.Itoa(len(stmt.Vars)))
-	d.checkAndAddError(stmt, err)
+	checkAndAddError(stmt, err)
 }
 
 func (d Dialector) QuoteTo(writer clause.Writer, s string) {
@@ -267,10 +267,4 @@ func (d Dialector) QuoteTo(writer clause.Writer, s string) {
 
 func (d Dialector) Explain(sql string, vars ...interface{}) string {
 	return logger.ExplainSQL(sql, nil, `'`, vars...)
-}
-
-func (d Dialector) checkAndAddError(stmt *gorm.Statement, err error) {
-	if err != nil {
-		_ = stmt.AddError(err)
-	}
 }

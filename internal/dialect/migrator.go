@@ -127,18 +127,11 @@ func (m Migrator) CreateTable(values ...interface{}) error {
 			}
 
 			if !m.DB.DisableForeignKeyConstraintWhenMigrating && !m.DB.IgnoreRelationshipsWhenMigrating {
-				for _, rel := range stmt.Schema.Relationships.Relations {
-					if rel.Field.IgnoreMigration {
-						continue
-					}
-					if constraint := rel.ParseConstraint(); constraint != nil {
-						if constraint.Schema == stmt.Schema {
-							sql, vars := buildConstraint(constraint)
-							createTableSQL += sql + ","
-							values = append(values, vars...)
-						}
-					}
-				}
+				//nolint:godox
+				// TODO: implement after support constraints in ydb
+				return xerrors.WithStacktrace(
+					fmt.Errorf("model %s: constraints not supported in ydb", stmt.Schema.Name),
+				)
 			}
 
 			for range stmt.Schema.ParseCheckConstraints() {
@@ -158,9 +151,9 @@ func (m Migrator) CreateTable(values ...interface{}) error {
 			}
 
 			err = tx.Exec(createTableSQL, values...).Error
-			return err
+			return xerrors.WithStacktrace(err)
 		}); err != nil {
-			return err
+			return xerrors.WithStacktrace(err)
 		}
 	}
 	return nil
@@ -199,29 +192,28 @@ func (m Migrator) HasTable(model interface{}) bool {
 		tableName = stmt.Table
 	} else {
 		s, err := m.schemaByValue(model)
+		checkAndAddError(stmt, xerrors.WithStacktrace(err))
 		if err != nil {
-			_ = stmt.AddError(err)
 			return false
 		}
 		tableName = s.Table
 	}
 
 	sqlDB, err := m.DB.DB()
+	checkAndAddError(stmt, xerrors.WithStacktrace(fmt.Errorf("error getting database/sql driver from gorm: %w", err)))
 	if err != nil {
-		_ = stmt.AddError(
-			xerrors.WithStacktrace(fmt.Errorf("error getting database/sql driver from gorm: %w", err)),
-		)
 		return false
 	}
 
 	db, err := ydbDriver.Unwrap(sqlDB)
+	checkAndAddError(stmt, xerrors.WithStacktrace(fmt.Errorf("ydb driver unwrap failed: %w", err)))
 	if err != nil {
-		_ = stmt.AddError(xerrors.WithStacktrace(fmt.Errorf("ydb driver unwrap failed: %w", err)))
+		return false
 	}
 
 	exists, err := sugar.IsTableExists(stmt.Context, db.Scheme(), m.fullTableName(tableName))
+	checkAndAddError(stmt, xerrors.WithStacktrace(err))
 	if err != nil {
-		_ = stmt.AddError(err)
 		return false
 	}
 
@@ -234,14 +226,15 @@ func (m Migrator) AddColumn(value interface{}, name string) error {
 		// avoid using the same name field
 		f := stmt.Schema.LookUpField(name)
 		if f == nil {
-			return fmt.Errorf("failed to look up field with name: %s", name)
+			return xerrors.WithStacktrace(fmt.Errorf("failed to look up field with name: %s", name))
 		}
 
 		if !f.IgnoreMigration {
-			return m.DB.WithContext(ydbDriver.WithQueryMode(context.Background(), ydbDriver.SchemeQueryMode)).Exec(
+			err := m.DB.WithContext(ydbDriver.WithQueryMode(context.Background(), ydbDriver.SchemeQueryMode)).Exec(
 				"ALTER TABLE ? ADD ? ?",
 				m.CurrentTable(stmt), clause.Column{Name: f.DBName}, m.DB.Migrator().FullDataTypeOf(f),
 			).Error
+			return xerrors.WithStacktrace(err)
 		}
 
 		return nil
@@ -255,14 +248,15 @@ func (m Migrator) DropColumn(value interface{}, name string) error {
 			name = field.DBName
 		}
 
-		return m.DB.WithContext(ydbDriver.WithQueryMode(context.Background(), ydbDriver.SchemeQueryMode)).Exec(
+		err := m.DB.WithContext(ydbDriver.WithQueryMode(context.Background(), ydbDriver.SchemeQueryMode)).Exec(
 			"ALTER TABLE ? DROP COLUMN ?", m.CurrentTable(stmt), clause.Column{Name: name},
 		).Error
+		return xerrors.WithStacktrace(err)
 	})
 }
 
 // AlterColumn alter value's `field` column type based on schema definition
-func (m Migrator) AlterColumn(value interface{}, field string) error {
+func (m Migrator) AlterColumn(_ interface{}, field string) error {
 	return xerrors.WithStacktrace(fmt.Errorf("field `%s`: alter column not supported", field))
 }
 
@@ -270,7 +264,7 @@ func (m Migrator) AlterColumn(value interface{}, field string) error {
 func (m Migrator) ColumnTypes(value interface{}) ([]gorm.ColumnType, error) {
 	s, err := m.schemaByValue(value)
 	if err != nil {
-		return nil, err
+		return nil, xerrors.WithStacktrace(err)
 	}
 	tableName := s.Table
 
@@ -283,13 +277,13 @@ func (m Migrator) ColumnTypes(value interface{}) ([]gorm.ColumnType, error) {
 		var db *sql.DB
 		db, err = m.DB.DB()
 		if err != nil {
-			return err
+			return xerrors.WithStacktrace(err)
 		}
 
 		var cc *ydbDriver.Driver
 		cc, err = ydbDriver.Unwrap(db)
 		if err != nil {
-			return err
+			return xerrors.WithStacktrace(err)
 		}
 
 		pt := m.fullTableName(tableName)
@@ -297,10 +291,10 @@ func (m Migrator) ColumnTypes(value interface{}) ([]gorm.ColumnType, error) {
 		var desc options.Description
 		err = cc.Table().Do(stmt.Context, func(ctx context.Context, s table.Session) (err error) {
 			desc, err = s.DescribeTable(ctx, pt)
-			return err
+			return xerrors.WithStacktrace(err)
 		}, table.WithIdempotent())
 		if err != nil {
-			return fmt.Errorf("describe '%s' failed: %w", pt, err)
+			return xerrors.WithStacktrace(fmt.Errorf("describe '%s' failed: %w", pt, err))
 		}
 
 		var ct gorm.ColumnType
@@ -310,7 +304,7 @@ func (m Migrator) ColumnTypes(value interface{}) ([]gorm.ColumnType, error) {
 				if f.DBName == column.Name {
 					ct, _, err = TypeByYdbType(f, column.Type)
 					if err != nil {
-						return err
+						return xerrors.WithStacktrace(err)
 					}
 
 					columnTypes = append(columnTypes, ct)
@@ -323,7 +317,7 @@ func (m Migrator) ColumnTypes(value interface{}) ([]gorm.ColumnType, error) {
 		return
 	})
 
-	return columnTypes, execErr
+	return columnTypes, xerrors.WithStacktrace(execErr)
 }
 
 func (m Migrator) schemaByValue(model interface{}) (*schema.Schema, error) {
@@ -337,7 +331,7 @@ func (m Migrator) schemaByValue(model interface{}) (*schema.Schema, error) {
 func (m Migrator) fullTableName(tableName string) string {
 	d, ok := m.Dialector.(Dialector)
 	if !ok {
-		_ = m.DB.Statement.AddError(xerrors.WithStacktrace(errors.New("error conversion to Dialector")))
+		checkAndAddError(m.DB.Statement, xerrors.WithStacktrace(errors.New("error conversion to Dialector")))
 		return ""
 	}
 
@@ -345,45 +339,15 @@ func (m Migrator) fullTableName(tableName string) string {
 
 	db, err := m.DB.DB()
 	if err != nil {
-		_ = m.DB.Statement.AddError(xerrors.WithStacktrace(errors.New("error getting DB")))
+		checkAndAddError(m.DB.Statement, xerrors.WithStacktrace(errors.New("error getting DB")))
 		return ""
 	}
 
 	cc, err := ydbDriver.Unwrap(db)
 	if err != nil {
-		_ = m.DB.Statement.AddError(xerrors.WithStacktrace(errors.New("error unwrapping db")))
+		checkAndAddError(m.DB.Statement, xerrors.WithStacktrace(errors.New("error unwrapping db")))
 		return ""
 	}
 
 	return path.Join(cc.Name(), localPath)
-}
-
-func buildConstraint(constraint *schema.Constraint) (sql string, results []interface{}) {
-	sql = "CONSTRAINT ? FOREIGN KEY ? REFERENCES ??"
-	if constraint.OnDelete != "" {
-		sql += " ON DELETE " + constraint.OnDelete
-	}
-
-	if constraint.OnUpdate != "" {
-		sql += " ON UPDATE " + constraint.OnUpdate
-	}
-
-	foreignKeys := make([]interface{}, 0, len(constraint.ForeignKeys))
-	for _, field := range constraint.ForeignKeys {
-		foreignKeys = append(foreignKeys, clause.Column{Name: field.DBName})
-	}
-
-	references := make([]interface{}, 0, len(constraint.References))
-	for _, field := range constraint.References {
-		references = append(references, clause.Column{Name: field.DBName})
-	}
-
-	results = append(results,
-		clause.Table{Name: constraint.Name},
-		foreignKeys,
-		clause.Table{Name: constraint.ReferenceSchema.Table},
-		references,
-	)
-
-	return
 }

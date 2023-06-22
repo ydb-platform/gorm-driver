@@ -3,8 +3,6 @@ package dialect
 import (
 	"bytes"
 	"database/sql"
-	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -275,48 +273,4 @@ func TestDialector_BindVarTo(t *testing.T) {
 			require.Equal(t, tt.expected, writer.String())
 		})
 	}
-}
-
-func TestDialector_checkAndAddError(t *testing.T) {
-	d := &Dialector{}
-
-	t.Run("", func(t *testing.T) {
-		stmt := gorm.Statement{
-			DB: &gorm.DB{
-				Config: &gorm.Config{},
-			},
-		}
-
-		d.checkAndAddError(&stmt, nil)
-
-		require.Nil(t, stmt.Error)
-	})
-
-	t.Run("", func(t *testing.T) {
-		stmt := gorm.Statement{
-			DB: &gorm.DB{
-				Config: &gorm.Config{},
-			},
-		}
-		err := errors.New("some error")
-
-		d.checkAndAddError(&stmt, err)
-
-		require.ErrorIs(t, stmt.Error, err)
-	})
-
-	t.Run("", func(t *testing.T) {
-		stmt := gorm.Statement{
-			DB: &gorm.DB{
-				Config: &gorm.Config{},
-			},
-		}
-		err := errors.New("some error")
-		anotherErr := fmt.Errorf("another error: %w", err)
-
-		d.checkAndAddError(&stmt, anotherErr)
-
-		require.ErrorIs(t, stmt.Error, anotherErr)
-		require.ErrorIs(t, stmt.Error, err)
-	})
 }
