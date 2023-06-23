@@ -1,1 +1,1 @@
-* YDB native driver replaced with database/sql
+* Implemented `gorm-driver` for `YDB` with `database/sql` `YDB` driver
