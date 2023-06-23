@@ -36,3 +36,38 @@ func TestStacktraceError(t *testing.T) {
 		})
 	}
 }
+
+func TestWithStacktrace(t *testing.T) {
+	err := WithStacktrace(nil)
+	require.Nil(t, err)
+}
+
+func Test_fileName(t *testing.T) {
+	tests := []struct {
+		path     string
+		fileName string
+	}{
+		{path: "foo/bar/baz.log", fileName: "baz.log"},
+		{path: "foo/bar.log", fileName: "bar.log"},
+		{path: "foo.log", fileName: "foo.log"},
+	}
+	for _, tt := range tests {
+		t.Run("", func(t *testing.T) {
+			name := fileName(tt.path)
+			require.Equal(t, tt.fileName, name)
+		})
+	}
+}
+
+func Test_stackError(t *testing.T) {
+	s := stackError{
+		stackRecord: "foo/bar/baz.log",
+		err:         errors.New("some error"),
+	}
+
+	msg := s.Error()
+	require.Equal(t, "some error at `foo/bar/baz.log`", msg)
+
+	err := s.Unwrap()
+	require.Equal(t, s.err, err)
+}

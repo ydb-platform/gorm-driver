@@ -12,9 +12,19 @@ import (
 	"github.com/ydb-platform/gorm-driver/internal/xerrors"
 )
 
-type TypeByYdbTypeOption func(columnType *migrator.ColumnType)
+// toColumnTypeOption is option type for toColumnType.
+type toColumnTypeOption func(columnType *migrator.ColumnType) error
 
-func TypeByYdbType(f *schema.Field, t types.Type, opts ...TypeByYdbTypeOption) (gorm.ColumnType, types.Type, error) {
+// toColumnType generate gorm.ColumnType from schema.Field and ydb Type.
+func toColumnType(f *schema.Field, t types.Type, opts ...toColumnTypeOption) (gorm.ColumnType, error) {
+	nullable := false
+	isOptional, innerType := types.IsOptional(t)
+	for isOptional {
+		nullable = true
+		t = innerType
+		isOptional, innerType = types.IsOptional(t)
+	}
+
 	columnType := migrator.ColumnType{
 		NameValue: sql.NullString{
 			String: f.DBName,
@@ -33,7 +43,7 @@ func TypeByYdbType(f *schema.Field, t types.Type, opts ...TypeByYdbTypeOption) (
 			Valid: true,
 		},
 		NullableValue: sql.NullBool{
-			Bool:  true,
+			Bool:  nullable,
 			Valid: true,
 		},
 		LengthValue: sql.NullInt64{
@@ -42,50 +52,59 @@ func TypeByYdbType(f *schema.Field, t types.Type, opts ...TypeByYdbTypeOption) (
 		},
 	}
 	for _, opt := range opts {
-		opt(&columnType)
+		err := opt(&columnType)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return columnType, t, nil
+	return columnType, nil
 }
 
-func Type(f *schema.Field) (gorm.ColumnType, types.Type, error) {
+// parseField parse schema.Field and generate gorm.ColumnType with ydb Type.
+func parseField(f *schema.Field) (gorm.ColumnType, types.Type, error) {
+	wrapType := func(t types.Type) (gorm.ColumnType, types.Type, error) {
+		ct, err := toColumnType(f, t)
+		return ct, t, err
+	}
+
 	switch f.DataType {
 	case schema.Bool:
-		return TypeByYdbType(f, types.TypeBool)
+		return wrapType(types.TypeBool)
 	case schema.Int:
 		switch {
 		case f.Size <= 8:
-			return TypeByYdbType(f, types.TypeInt8)
+			return wrapType(types.TypeInt8)
 		case f.Size <= 16:
-			return TypeByYdbType(f, types.TypeInt16)
+			return wrapType(types.TypeInt16)
 		case f.Size <= 32:
-			return TypeByYdbType(f, types.TypeInt32)
+			return wrapType(types.TypeInt32)
 		default:
-			return TypeByYdbType(f, types.TypeInt64)
+			return wrapType(types.TypeInt64)
 		}
 	case schema.Uint:
 		switch {
 		case f.Size <= 8:
-			return TypeByYdbType(f, types.TypeUint8)
+			return wrapType(types.TypeUint8)
 		case f.Size <= 16:
-			return TypeByYdbType(f, types.TypeUint16)
+			return wrapType(types.TypeUint16)
 		case f.Size <= 32:
-			return TypeByYdbType(f, types.TypeUint32)
+			return wrapType(types.TypeUint32)
 		default:
-			return TypeByYdbType(f, types.TypeUint64)
+			return wrapType(types.TypeUint64)
 		}
 	case schema.Float:
 		switch {
 		case f.Size <= 32:
-			return TypeByYdbType(f, types.TypeFloat)
+			return wrapType(types.TypeFloat)
 		default:
-			return TypeByYdbType(f, types.TypeDouble)
+			return wrapType(types.TypeDouble)
 		}
 	case schema.String:
-		return TypeByYdbType(f, types.TypeText)
+		return wrapType(types.TypeText)
 	case schema.Bytes:
-		return TypeByYdbType(f, types.TypeBytes)
+		return wrapType(types.TypeBytes)
 	case schema.Time:
-		return TypeByYdbType(f, types.TypeTimestamp)
+		return wrapType(types.TypeTimestamp)
 	default:
 		return nil, nil, xerrors.WithStacktrace(fmt.Errorf("unsupported data type '%s'", f.DataType))
 	}

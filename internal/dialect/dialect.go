@@ -10,7 +10,7 @@ import (
 	"time"
 
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
-	ydbDriver "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"gorm.io/gorm"
 	"gorm.io/gorm/callbacks"
 	"gorm.io/gorm/clause"
@@ -21,49 +21,57 @@ import (
 	"github.com/ydb-platform/gorm-driver/internal/xerrors"
 )
 
+// Option is option for Dialector New constructor.
 type Option func(d *Dialector)
 
-func With(opts ...ydbDriver.Option) Option {
+// With apply ydb.Option to Dialector.
+func With(opts ...ydb.Option) Option {
 	return func(d *Dialector) {
 		d.opts = append(d.opts, opts...)
 	}
 }
 
+// WithTablePathPrefix apply table path prefix to Dialector.
 func WithTablePathPrefix(tablePathPrefix string) Option {
 	return func(d *Dialector) {
 		d.tablePathPrefix = tablePathPrefix
 	}
 }
 
+// WithMaxOpenConns apply max open conns to Dialector.
 func WithMaxOpenConns(maxOpenConns int) Option {
 	return func(d *Dialector) {
 		d.maxOpenConns = maxOpenConns
 	}
 }
 
+// WithMaxIdleConns apply max idle conns to Dialector.
 func WithMaxIdleConns(maxIdleConns int) Option {
 	return func(d *Dialector) {
 		d.maxIdleConns = maxIdleConns
 	}
 }
 
+// WithConnMaxIdleTime apply max idle time to Dialector.
 func WithConnMaxIdleTime(connMaxIdleTime time.Duration) Option {
 	return func(d *Dialector) {
 		d.connMaxIdleTime = connMaxIdleTime
 	}
 }
 
+// Dialector is implementation of gorm.Dialector.
 type Dialector struct {
 	DSN  string
 	Conn gorm.ConnPool
 
-	opts            []ydbDriver.Option
+	opts            []ydb.Option
 	tablePathPrefix string
 	maxOpenConns    int
 	maxIdleConns    int
 	connMaxIdleTime time.Duration
 }
 
+// New is constructor for Dialector.
 func New(dsn string, opts ...Option) *Dialector {
 	d := &Dialector{
 		DSN: dsn,
@@ -79,9 +87,7 @@ func New(dsn string, opts ...Option) *Dialector {
 }
 
 func (d Dialector) Name() string {
-	//nolint:godox
-	// TODO implement me
-	panic("implement me")
+	return "ydb"
 }
 
 func (d Dialector) Initialize(db *gorm.DB) error {
@@ -91,7 +97,7 @@ func (d Dialector) Initialize(db *gorm.DB) error {
 	if d.Conn != nil {
 		db.ConnPool = d.Conn
 	} else {
-		cc, err := ydbDriver.Open(ctx,
+		cc, err := ydb.Open(ctx,
 			d.DSN,
 			environ.WithEnvironCredentials(ctx),
 		)
@@ -101,10 +107,10 @@ func (d Dialector) Initialize(db *gorm.DB) error {
 
 		d.tablePathPrefix = path.Join(cc.Name(), d.tablePathPrefix)
 
-		c, err := ydbDriver.Connector(cc,
-			ydbDriver.WithTablePathPrefix(d.tablePathPrefix),
-			ydbDriver.WithAutoDeclare(),
-			ydbDriver.WithNumericArgs(),
+		c, err := ydb.Connector(cc,
+			ydb.WithTablePathPrefix(d.tablePathPrefix),
+			ydb.WithAutoDeclare(),
+			ydb.WithNumericArgs(),
 		)
 		if err != nil {
 			return xerrors.WithStacktrace(fmt.Errorf("create connector error: %w", err))
@@ -152,18 +158,18 @@ func (d Dialector) ClauseBuilders() map[string]clause.ClauseBuilder {
 			}
 
 			_, err := stmt.WriteString("UPSERT ")
-			d.checkAndAddError(stmt, err)
+			checkAndAddError(stmt, err)
 
 			if insert.Modifier != "" {
 				_, err = stmt.WriteString(insert.Modifier)
-				d.checkAndAddError(stmt, err)
+				checkAndAddError(stmt, err)
 
 				err = stmt.WriteByte(' ')
-				d.checkAndAddError(stmt, err)
+				checkAndAddError(stmt, err)
 			}
 
 			_, err = stmt.WriteString("INTO ")
-			d.checkAndAddError(stmt, err)
+			checkAndAddError(stmt, err)
 
 			if insert.Table.Name == "" {
 				stmt.WriteQuoted(stmt.Table)
@@ -189,33 +195,25 @@ func (d Dialector) Migrator(db *gorm.DB) gorm.Migrator {
 }
 
 func (d Dialector) DataTypeOf(field *schema.Field) string {
-	t, _, err := Type(field)
+	t, _, err := parseField(field)
 	if err != nil {
-		panic(
-			xerrors.WithStacktrace(
-				fmt.Errorf("error getting field (model %s, field %s) type: %w",
-					field.Schema.Name,
-					field.Name,
-					err,
-				),
-			),
-		)
+		panic(fmt.Errorf("error getting field (model %s, field %s) type: %w", field.Schema.Name, field.Name, err))
 	}
 	return t.DatabaseTypeName()
 }
 
-func (d Dialector) DefaultValueOf(field *schema.Field) clause.Expression {
+func (d Dialector) DefaultValueOf(_ *schema.Field) clause.Expression {
 	//nolint:godox
-	// TODO implement me
-	panic("implement me")
+	// TODO: implement after support DEFAULT in ydb
+	panic("DEFAULT in not supported in ydb")
 }
 
-func (d Dialector) BindVarTo(writer clause.Writer, stmt *gorm.Statement, v interface{}) {
+func (d Dialector) BindVarTo(writer clause.Writer, stmt *gorm.Statement, _ interface{}) {
 	err := writer.WriteByte('$')
-	d.checkAndAddError(stmt, err)
+	checkAndAddError(stmt, err)
 
 	_, err = writer.WriteString(strconv.Itoa(len(stmt.Vars)))
-	d.checkAndAddError(stmt, err)
+	checkAndAddError(stmt, err)
 }
 
 func (d Dialector) QuoteTo(writer clause.Writer, s string) {
@@ -223,6 +221,7 @@ func (d Dialector) QuoteTo(writer clause.Writer, s string) {
 		underQuoted, selfQuoted bool
 		continuousBacktick      int8
 		shiftDelimiter          int8
+		backticksCount          int8
 	)
 
 	for _, v := range []byte(s) {
@@ -231,6 +230,7 @@ func (d Dialector) QuoteTo(writer clause.Writer, s string) {
 			continuousBacktick++
 			if continuousBacktick == 2 {
 				_, _ = writer.WriteString("``")
+				backticksCount += 2
 				continuousBacktick = 0
 			}
 		case '.':
@@ -239,12 +239,14 @@ func (d Dialector) QuoteTo(writer clause.Writer, s string) {
 				underQuoted = false
 				continuousBacktick = 0
 				_ = writer.WriteByte('`')
+				backticksCount++
 			}
 			_ = writer.WriteByte(v)
 			continue
 		default:
 			if shiftDelimiter-continuousBacktick <= 0 && !underQuoted {
 				_ = writer.WriteByte('`')
+				backticksCount++
 				underQuoted = true
 				if selfQuoted = continuousBacktick > 0; selfQuoted {
 					continuousBacktick--
@@ -253,6 +255,7 @@ func (d Dialector) QuoteTo(writer clause.Writer, s string) {
 
 			for ; continuousBacktick > 0; continuousBacktick-- {
 				_, _ = writer.WriteString("``")
+				backticksCount += 2
 			}
 
 			_ = writer.WriteByte(v)
@@ -262,16 +265,14 @@ func (d Dialector) QuoteTo(writer clause.Writer, s string) {
 
 	if continuousBacktick > 0 && !selfQuoted {
 		_, _ = writer.WriteString("``")
+		backticksCount += 2
 	}
-	_ = writer.WriteByte('`')
+
+	if backticksCount%2 != 0 {
+		_ = writer.WriteByte('`')
+	}
 }
 
 func (d Dialector) Explain(sql string, vars ...interface{}) string {
 	return logger.ExplainSQL(sql, nil, `'`, vars...)
-}
-
-func (d Dialector) checkAndAddError(stmt *gorm.Statement, err error) {
-	if err != nil {
-		_ = stmt.AddError(err)
-	}
 }

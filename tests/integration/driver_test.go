@@ -15,7 +15,7 @@ func TestDriver(t *testing.T) {
 	type Product struct {
 		ID    uint `gorm:"primarykey;not null;autoIncrement:false"`
 		Code  string
-		Price uint
+		Price uint `gorm:"index"`
 	}
 
 	dsn, has := os.LookupEnv("YDB_CONNECTION_STRING")
@@ -23,7 +23,11 @@ func TestDriver(t *testing.T) {
 		t.Skip("skip test '" + t.Name() + "' without env 'YDB_CONNECTION_STRING'")
 	}
 
-	db, err := gorm.Open(ydb.Open(dsn))
+	db, err := gorm.Open(
+		ydb.Open(dsn,
+			ydb.WithTablePathPrefix(t.Name()),
+		),
+	)
 	require.NoError(t, err)
 	require.NotNil(t, db)
 
@@ -62,5 +66,9 @@ func TestDriver(t *testing.T) {
 
 	// Delete - delete product
 	err = db.Delete(&product, 1).Error
+	require.NoError(t, err)
+
+	// Drop table
+	err = db.Migrator().DropTable(&Product{})
 	require.NoError(t, err)
 }
