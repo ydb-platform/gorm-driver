@@ -12,8 +12,10 @@ import (
 	"github.com/ydb-platform/gorm-driver/internal/xerrors"
 )
 
+// TypeByYdbTypeOption is option type for TypeByYdbType.
 type TypeByYdbTypeOption func(columnType *migrator.ColumnType)
 
+// TypeByYdbType generate gorm.ColumnType from schema.Field and ydb Type.
 func TypeByYdbType(f *schema.Field, t types.Type, opts ...TypeByYdbTypeOption) (gorm.ColumnType, types.Type, error) {
 	nullable := false
 	isOptional, innerType := types.IsOptional(t)
@@ -55,6 +57,7 @@ func TypeByYdbType(f *schema.Field, t types.Type, opts ...TypeByYdbTypeOption) (
 	return columnType, t, nil
 }
 
+// Type parse schema.Field and generate gorm.ColumnType with ydb Type.
 func Type(f *schema.Field) (gorm.ColumnType, types.Type, error) {
 	switch f.DataType {
 	case schema.Bool:

@@ -21,12 +21,14 @@ import (
 	"github.com/ydb-platform/gorm-driver/internal/xerrors"
 )
 
+// Migrator is wrapper for gorm.Migrator.
 type Migrator struct {
 	migrator.Migrator
 
 	cacheStore *sync.Map
 }
 
+// FullDataTypeOf returns field's db full data type.
 func (m Migrator) FullDataTypeOf(field *schema.Field) (expr clause.Expr) {
 	expr.SQL = m.DataTypeOf(field)
 
@@ -59,6 +61,7 @@ func (m Migrator) FullDataTypeOf(field *schema.Field) (expr clause.Expr) {
 	return expr
 }
 
+// CreateTable create table in database for values.
 func (m Migrator) CreateTable(values ...interface{}) error {
 	for _, value := range m.ReorderModels(values, false) {
 		tx := m.DB.Session(&gorm.Session{})
@@ -159,6 +162,7 @@ func (m Migrator) CreateTable(values ...interface{}) error {
 	return nil
 }
 
+// DropTable drop table for values.
 func (m Migrator) DropTable(models ...interface{}) error {
 	for _, model := range models {
 		if m.HasTable(model) {
@@ -184,6 +188,7 @@ func (m Migrator) DropTable(models ...interface{}) error {
 	return nil
 }
 
+// HasTable returns table exists or not for value, value could be a struct or string.
 func (m Migrator) HasTable(model interface{}) bool {
 	stmt := m.DB.Statement
 
@@ -220,7 +225,7 @@ func (m Migrator) HasTable(model interface{}) bool {
 	return exists
 }
 
-// AddColumn create `name` column for value
+// AddColumn create `name` column for value.
 func (m Migrator) AddColumn(value interface{}, name string) error {
 	return m.RunWithValue(value, func(stmt *gorm.Statement) error {
 		// avoid using the same name field
@@ -241,7 +246,7 @@ func (m Migrator) AddColumn(value interface{}, name string) error {
 	})
 }
 
-// DropColumn drop value's `name` column
+// DropColumn drop value's `name` column.
 func (m Migrator) DropColumn(value interface{}, name string) error {
 	return m.RunWithValue(value, func(stmt *gorm.Statement) error {
 		if field := stmt.Schema.LookUpField(name); field != nil {
@@ -255,12 +260,12 @@ func (m Migrator) DropColumn(value interface{}, name string) error {
 	})
 }
 
-// AlterColumn alter value's `field` column type based on schema definition
+// AlterColumn alter value's `field` column type based on schema definition.
 func (m Migrator) AlterColumn(_ interface{}, field string) error {
 	return xerrors.WithStacktrace(fmt.Errorf("field `%s`: alter column not supported", field))
 }
 
-// ColumnTypes return columnTypes []gorm.ColumnType and execErr error
+// ColumnTypes return columnTypes []gorm.ColumnType and execErr error.
 func (m Migrator) ColumnTypes(value interface{}) ([]gorm.ColumnType, error) {
 	s, err := m.schemaByValue(value)
 	if err != nil {

@@ -21,38 +21,45 @@ import (
 	"github.com/ydb-platform/gorm-driver/internal/xerrors"
 )
 
+// Option is option for Dialector New constructor.
 type Option func(d *Dialector)
 
+// With apply ydb.Option to Dialector.
 func With(opts ...ydb.Option) Option {
 	return func(d *Dialector) {
 		d.opts = append(d.opts, opts...)
 	}
 }
 
+// WithTablePathPrefix apply table path prefix to Dialector.
 func WithTablePathPrefix(tablePathPrefix string) Option {
 	return func(d *Dialector) {
 		d.tablePathPrefix = tablePathPrefix
 	}
 }
 
+// WithMaxOpenConns apply max open conns to Dialector.
 func WithMaxOpenConns(maxOpenConns int) Option {
 	return func(d *Dialector) {
 		d.maxOpenConns = maxOpenConns
 	}
 }
 
+// WithMaxIdleConns apply max idle conns to Dialector.
 func WithMaxIdleConns(maxIdleConns int) Option {
 	return func(d *Dialector) {
 		d.maxIdleConns = maxIdleConns
 	}
 }
 
+// WithConnMaxIdleTime apply max idle time to Dialector.
 func WithConnMaxIdleTime(connMaxIdleTime time.Duration) Option {
 	return func(d *Dialector) {
 		d.connMaxIdleTime = connMaxIdleTime
 	}
 }
 
+// Dialector is implementation of gorm.Dialector.
 type Dialector struct {
 	DSN  string
 	Conn gorm.ConnPool
@@ -64,6 +71,7 @@ type Dialector struct {
 	connMaxIdleTime time.Duration
 }
 
+// New is constructor for Dialector.
 func New(dsn string, opts ...Option) *Dialector {
 	d := &Dialector{
 		DSN: dsn,
