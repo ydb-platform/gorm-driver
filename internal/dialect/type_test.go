@@ -2,6 +2,7 @@ package dialect
 
 import (
 	"database/sql"
+	"errors"
 	"testing"
 
 	"github.com/google/uuid"
@@ -11,12 +12,13 @@ import (
 	"gorm.io/gorm/schema"
 )
 
-func TestTypeByYdbType(t *testing.T) {
+func Test_schemaFieldToColumnType(t *testing.T) {
 	tests := []struct {
 		field     *schema.Field
 		typesType types.Type
 		nullable  bool
-		options   []TypeByYdbTypeOption
+		options   []toColumnTypeOption
+		isErrors  bool
 	}{
 		{
 			field: &schema.Field{
@@ -49,14 +51,28 @@ func TestTypeByYdbType(t *testing.T) {
 			},
 			nullable:  true,
 			typesType: types.TypeBool,
-			options: []TypeByYdbTypeOption{
-				func(columnType *migrator.ColumnType) {
+			options: []toColumnTypeOption{
+				func(columnType *migrator.ColumnType) error {
 					columnType.NullableValue = sql.NullBool{
 						Bool:  true,
 						Valid: true,
 					}
+					return nil
 				},
 			},
+		},
+		{
+			field: &schema.Field{
+				DBName:   uuid.New().String(),
+				DataType: schema.Bool,
+			},
+			typesType: types.TypeBool,
+			options: []toColumnTypeOption{
+				func(columnType *migrator.ColumnType) error {
+					return errors.New("some error")
+				},
+			},
+			isErrors: true,
 		},
 		{
 			field: &schema.Field{
@@ -69,18 +85,21 @@ func TestTypeByYdbType(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run("", func(t *testing.T) {
-			columnType, typesType, err := TypeByYdbType(
+			columnType, err := toColumnType(
 				tt.field,
 				tt.typesType,
 				tt.options...,
 			)
+
+			if tt.isErrors {
+				require.Error(t, err)
+				return
+			}
 			require.NoError(t, err)
 
 			if isOptional, innerType := types.IsOptional(tt.typesType); isOptional {
 				tt.typesType = innerType
 			}
-
-			require.Equal(t, tt.typesType, typesType)
 
 			require.Equal(t, tt.field.DBName, columnType.Name())
 			require.Equal(t, tt.typesType.Yql(), columnType.DatabaseTypeName())
@@ -100,7 +119,7 @@ func TestTypeByYdbType(t *testing.T) {
 	}
 }
 
-func TestType(t *testing.T) {
+func Test_parseField(t *testing.T) {
 	tests := []struct {
 		field     *schema.Field
 		typesType types.Type
@@ -207,7 +226,7 @@ func TestType(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run("", func(t *testing.T) {
-			columnType, typesType, err := Type(tt.field)
+			columnType, typesType, err := parseField(tt.field)
 			if tt.isError {
 				require.Error(t, err)
 				return

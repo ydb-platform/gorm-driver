@@ -195,7 +195,7 @@ func (d Dialector) Migrator(db *gorm.DB) gorm.Migrator {
 }
 
 func (d Dialector) DataTypeOf(field *schema.Field) string {
-	t, _, err := Type(field)
+	t, _, err := parseField(field)
 	if err != nil {
 		panic(fmt.Errorf("error getting field (model %s, field %s) type: %w", field.Schema.Name, field.Name, err))
 	}

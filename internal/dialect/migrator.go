@@ -303,18 +303,17 @@ func (m Migrator) ColumnTypes(value interface{}) ([]gorm.ColumnType, error) {
 		}
 
 		var ct gorm.ColumnType
-	field:
 		for _, f := range stmt.Schema.Fields {
 			for _, column := range desc.Columns {
 				if f.DBName == column.Name {
-					ct, _, err = TypeByYdbType(f, column.Type)
+					ct, err = toColumnType(f, column.Type)
 					if err != nil {
 						return xerrors.WithStacktrace(err)
 					}
 
 					columnTypes = append(columnTypes, ct)
 
-					continue field
+					break
 				}
 			}
 		}
