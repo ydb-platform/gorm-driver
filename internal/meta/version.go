@@ -2,6 +2,6 @@ package meta
 
 const (
 	VersionMajor = "0"
-	VersionMinor = "0"
-	VersionPatch = "5"
+	VersionMinor = "1"
+	VersionPatch = "0"
 )
