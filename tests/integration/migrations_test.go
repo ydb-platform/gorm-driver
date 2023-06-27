@@ -28,11 +28,13 @@ func TestSequentialAutoMigrate(t *testing.T) {
 		t.Skip("skip test '" + t.Name() + "' without env 'YDB_CONNECTION_STRING'")
 	}
 
+	pathPrefix := t.Name()
+
 	for i := 0; i < 5; i++ {
 		t.Run("", func(t *testing.T) {
 			db, err := gorm.Open(
 				ydb.Open(dsn,
-					ydb.WithTablePathPrefix(t.Name()),
+					ydb.WithTablePathPrefix(pathPrefix),
 				),
 			)
 			require.NoError(t, err)
