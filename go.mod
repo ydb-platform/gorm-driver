@@ -3,8 +3,9 @@ module github.com/ydb-platform/gorm-driver
 go 1.18
 
 require (
+	github.com/google/uuid v1.3.0
 	github.com/ydb-platform/ydb-go-sdk-auth-environ v0.2.0
-	github.com/ydb-platform/ydb-go-sdk/v3 v3.48.3
+	github.com/ydb-platform/ydb-go-sdk/v3 v3.48.4
 	gorm.io/gorm v1.25.1
 )
 
@@ -16,7 +17,6 @@ require (
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/golang-jwt/jwt/v4 v4.4.1 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
-	github.com/google/uuid v1.3.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/jonboulle/clockwork v0.3.0 // indirect
