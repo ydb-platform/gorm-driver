@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/google/uuid v1.3.0
 	github.com/ydb-platform/ydb-go-sdk-auth-environ v0.2.0
-	github.com/ydb-platform/ydb-go-sdk/v3 v3.48.4
+	github.com/ydb-platform/ydb-go-sdk/v3 v3.48.8
 	gorm.io/gorm v1.25.1
 )
 
@@ -29,8 +29,8 @@ require (
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4 // indirect
 	golang.org/x/sys v0.5.0 // indirect
 	golang.org/x/text v0.7.0 // indirect
-	google.golang.org/genproto v0.0.0-20220421151946-72621c1f0bd3 // indirect
-	google.golang.org/grpc v1.49.0 // indirect
-	google.golang.org/protobuf v1.28.0 // indirect
+	google.golang.org/genproto v0.0.0-20230110181048-76db0878b65f // indirect
+	google.golang.org/grpc v1.53.0 // indirect
+	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
