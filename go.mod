@@ -3,7 +3,7 @@ module github.com/ydb-platform/gorm-driver
 go 1.18
 
 require (
-	github.com/google/uuid v1.3.0
+	github.com/google/uuid v1.4.0
 	github.com/ydb-platform/ydb-go-sdk-auth-environ v0.2.0
 	github.com/ydb-platform/ydb-go-sdk/v3 v3.48.4
 	gorm.io/gorm v1.25.1
