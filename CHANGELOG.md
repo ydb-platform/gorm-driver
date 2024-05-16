@@ -12,6 +12,9 @@
   * google.golang.org/grpc v1.57.1 => v1.64.0
   * google.golang.org/protobuf v1.33.0 => v1.34.1
   * gorm.io/gorm v1.25.1 => v1.25.10
+  * github.com/ydb-platform/ydb-go-sdk-auth-environ v0.2.0 => v0.3.0
+  * github.com/ydb-platform/ydb-go-yc v0.10.2 => v0.12.1
+  * github.com/ydb-platform/ydb-go-yc-metadata v0.5.2 => v0.6.1
 
 ## v0.1.2
 * Updated dependencies
