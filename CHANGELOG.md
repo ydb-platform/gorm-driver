@@ -1,3 +1,4 @@
+## v0.1.3
 * Upgraded dependencies:
   * github.com/golang-jwt/jwt/v4 v4.4.1 => v4.5.0
   * github.com/golang/protobuf v1.5.3 => v1.5.4
