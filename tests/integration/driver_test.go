@@ -2,11 +2,11 @@ package integration
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/require"
+	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
+	"gorm.io/gorm"
 	"os"
 	"testing"
-
-	"github.com/stretchr/testify/require"
-	"gorm.io/gorm"
 
 	ydb "github.com/ydb-platform/gorm-driver"
 )
@@ -26,6 +26,7 @@ func TestDriver(t *testing.T) {
 	db, err := gorm.Open(
 		ydb.Open(dsn,
 			ydb.WithTablePathPrefix(t.Name()),
+			ydb.With(environ.WithEnvironCredentials()),
 		),
 	)
 	require.NoError(t, err)

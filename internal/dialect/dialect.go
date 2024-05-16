@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"gorm.io/gorm"
 	"gorm.io/gorm/callbacks"
@@ -97,10 +96,7 @@ func (d Dialector) Initialize(db *gorm.DB) error {
 	if d.Conn != nil {
 		db.ConnPool = d.Conn
 	} else {
-		cc, err := ydb.Open(ctx,
-			d.DSN,
-			environ.WithEnvironCredentials(ctx),
-		)
+		cc, err := ydb.Open(ctx, d.DSN, d.opts...)
 		if err != nil {
 			return xerrors.WithStacktrace(fmt.Errorf("connect error: %w", err))
 		}

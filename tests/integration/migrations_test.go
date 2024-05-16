@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 	"os"
 	"path"
 	"testing"
@@ -35,6 +36,7 @@ func TestSequentialAutoMigrate(t *testing.T) {
 			db, err := gorm.Open(
 				ydb.Open(dsn,
 					ydb.WithTablePathPrefix(pathPrefix),
+					ydb.With(environ.WithEnvironCredentials()),
 				),
 			)
 			require.NoError(t, err)
@@ -57,6 +59,7 @@ func TestMigrateColumn(t *testing.T) {
 	db, err := gorm.Open(
 		ydb.Open(dsn,
 			ydb.WithTablePathPrefix(t.Name()),
+			ydb.With(environ.WithEnvironCredentials()),
 		),
 	)
 	require.NoError(t, err)
@@ -260,6 +263,7 @@ func TestCreateTableWithOptions(t *testing.T) {
 	db, err := gorm.Open(
 		ydb.Open(dsn,
 			ydb.WithTablePathPrefix(t.Name()),
+			ydb.With(environ.WithEnvironCredentials()),
 		),
 	)
 	require.NoError(t, err)
