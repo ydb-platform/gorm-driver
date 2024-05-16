@@ -29,7 +29,7 @@ jobs:
       - name: Test
         run: go test -race -coverprofile unit.txt -covermode atomic ./internal/...
       - name: Upload coverage report to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           file: ./unit.txt
           flags: unit,${{ matrix.os }},go-${{ matrix.go-version }}
@@ -73,7 +73,7 @@ jobs:
       - name: Integration test
         run: go test -race -coverpkg=./internal/... -coverprofile integration.txt -covermode atomic ./tests/integration/...
       - name: Upload Test secure connection coverage report to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           file: ./integration.txt
           flags: integration,go-${{ matrix.go-version }},ydb-${{ matrix.ydb-version }}
