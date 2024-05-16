@@ -3,12 +3,12 @@ package integration
 import (
 	"context"
 	"fmt"
-	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 	"os"
 	"path"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 	ydbDriver "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"

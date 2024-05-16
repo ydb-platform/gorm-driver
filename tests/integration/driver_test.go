@@ -2,11 +2,12 @@ package integration
 
 import (
 	"fmt"
+	"os"
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 	"gorm.io/gorm"
-	"os"
-	"testing"
 
 	ydb "github.com/ydb-platform/gorm-driver"
 )
