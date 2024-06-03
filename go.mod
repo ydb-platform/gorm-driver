@@ -5,7 +5,7 @@ go 1.21
 require (
 	github.com/google/uuid v1.6.0
 	github.com/ydb-platform/ydb-go-sdk-auth-environ v0.3.0
-	github.com/ydb-platform/ydb-go-sdk/v3 v3.67.0
+	github.com/ydb-platform/ydb-go-sdk/v3 v3.69.0
 	gorm.io/gorm v1.25.10
 )
 
@@ -20,7 +20,7 @@ require (
 	github.com/jonboulle/clockwork v0.4.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/yandex-cloud/go-genproto v0.0.0-20211115083454-9ca41db5ed9e // indirect
-	github.com/ydb-platform/ydb-go-genproto v0.0.0-20240316140903-4a47abca1cca // indirect
+	github.com/ydb-platform/ydb-go-genproto v0.0.0-20240528144234-5d5a685e41f7 // indirect
 	github.com/ydb-platform/ydb-go-yc v0.12.1 // indirect
 	github.com/ydb-platform/ydb-go-yc-metadata v0.6.1 // indirect
 	golang.org/x/net v0.25.0 // indirect
