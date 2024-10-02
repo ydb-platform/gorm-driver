@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ydb-platform/gorm-driver/internal/xerrors"
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"gorm.io/gorm"
 	"gorm.io/gorm/callbacks"
@@ -16,8 +17,6 @@ import (
 	"gorm.io/gorm/logger"
 	"gorm.io/gorm/migrator"
 	"gorm.io/gorm/schema"
-
-	"github.com/ydb-platform/gorm-driver/internal/xerrors"
 )
 
 // Option is option for Dialector New constructor.

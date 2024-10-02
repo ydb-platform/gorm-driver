@@ -4,12 +4,11 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/ydb-platform/gorm-driver/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"gorm.io/gorm"
 	"gorm.io/gorm/migrator"
 	"gorm.io/gorm/schema"
-
-	"github.com/ydb-platform/gorm-driver/internal/xerrors"
 )
 
 // toColumnTypeOption is option type for toColumnType.

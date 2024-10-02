@@ -1,47 +1,43 @@
-package integration
+package ydb_test
 
 import (
 	"context"
 	"fmt"
-	"os"
-	"testing"
 
-	"github.com/stretchr/testify/require"
 	ydb "github.com/ydb-platform/gorm-driver"
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 	"gorm.io/gorm"
 )
 
-func TestDriver(t *testing.T) {
+func Example_query() {
 	type Product struct {
 		ID    uint `gorm:"primarykey;not null;autoIncrement:false"`
 		Code  string
 		Price uint `gorm:"index"`
 	}
 
-	dsn, has := os.LookupEnv("YDB_CONNECTION_STRING")
-	if !has {
-		t.Skip("skip test '" + t.Name() + "' without env 'YDB_CONNECTION_STRING'")
-	}
-
 	db, err := gorm.Open(
-		ydb.Open(dsn,
-			ydb.WithTablePathPrefix(t.Name()),
+		ydb.Open("grpc://localhost:2136/local",
 			ydb.With(environ.WithEnvironCredentials()),
 		),
 	)
-	require.NoError(t, err)
-	require.NotNil(t, db)
+	if err != nil {
+		panic(err)
+	}
 
 	db = db.Debug()
 
 	// Migrate the schema
 	err = db.AutoMigrate(&Product{})
-	require.NoError(t, err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Create
 	err = db.Create(&Product{ID: 1, Code: "D42", Price: 100}).Error
-	require.NoError(t, err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Scan query
 	var products []Product
@@ -50,38 +46,52 @@ func TestDriver(t *testing.T) {
 		Model(&Product{}).
 		Scan(&products).
 		Error
-	require.NoError(t, err)
-
-	fmt.Printf("%+v\n", products)
+	if err != nil {
+		panic(err)
+	}
 
 	// Read
 	var product Product
 	err = db.First(&product, 1).Error // find product with integer primary key
-	require.NoError(t, err)
+	if err != nil {
+		panic(err)
+	}
 
 	fmt.Printf("%+v\n", product)
 
 	err = db.First(&product, "code = ?", "D42").Error // find product with code D42
-	require.NoError(t, err)
+	if err != nil {
+		panic(err)
+	}
 
 	fmt.Printf("%+v\n", product)
 
 	// Update - update product's price to 200
 	err = db.Model(&product).Update("Price", 200).Error
-	require.NoError(t, err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Update - update multiple fields
 	err = db.Model(&product).Updates(Product{Price: 200, Code: "F42"}).Error // non-zero fields
-	require.NoError(t, err)
+	if err != nil {
+		panic(err)
+	}
 
 	err = db.Model(&product).Updates(map[string]interface{}{"Price": 200, "Code": "F42"}).Error
-	require.NoError(t, err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Delete - delete product
 	err = db.Delete(&product, 1).Error
-	require.NoError(t, err)
+	if err != nil {
+		panic(err)
+	}
 
 	// Drop table
 	err = db.Migrator().DropTable(&Product{})
-	require.NoError(t, err)
+	if err != nil {
+		panic(err)
+	}
 }
