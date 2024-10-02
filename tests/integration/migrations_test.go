@@ -8,13 +8,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	ydb "github.com/ydb-platform/gorm-driver"
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 	ydbDriver "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"gorm.io/gorm"
+
+	ydb "github.com/ydb-platform/gorm-driver"
 )
 
 func TestSequentialAutoMigrate(t *testing.T) {
@@ -49,6 +50,7 @@ func TestSequentialAutoMigrate(t *testing.T) {
 	}
 }
 
+//nolint:funlen
 func TestMigrateColumn(t *testing.T) {
 	dsn, has := os.LookupEnv("YDB_CONNECTION_STRING")
 	if !has {
@@ -282,6 +284,7 @@ func TestCreateTableWithOptions(t *testing.T) {
 	var desc options.Description
 	err = driver.Table().Do(context.Background(), func(ctx context.Context, s table.Session) (err error) {
 		desc, err = s.DescribeTable(ctx, path.Join(driver.Name(), t.Name(), "products"))
+
 		return err
 	}, table.WithIdempotent())
 	require.NoError(t, err)

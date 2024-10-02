@@ -11,6 +11,7 @@ func WithStacktrace(err error) error {
 	if err == nil {
 		return nil
 	}
+
 	return &stackError{
 		stackRecord: stackRecord(1),
 		err:         err,
@@ -20,6 +21,7 @@ func WithStacktrace(err error) error {
 func stackRecord(depth int) string {
 	function, file, line, _ := runtime.Caller(depth + 1)
 	name := runtime.FuncForPC(function).Name()
+
 	return name + "(" + fileName(file) + ":" + strconv.Itoa(line) + ")"
 }
 
@@ -28,6 +30,7 @@ func fileName(original string) string {
 	if i == -1 {
 		return original
 	}
+
 	return original[i+1:]
 }
 

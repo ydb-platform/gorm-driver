@@ -7,11 +7,13 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	ydb "github.com/ydb-platform/gorm-driver"
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 	"gorm.io/gorm"
+
+	ydb "github.com/ydb-platform/gorm-driver"
 )
 
+//nolint:funlen
 func TestDriver(t *testing.T) {
 	type Product struct {
 		ID    uint `gorm:"primarykey;not null;autoIncrement:false"`

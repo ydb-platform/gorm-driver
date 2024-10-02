@@ -129,6 +129,7 @@ func TestDialector_DataTypeOf(t *testing.T) {
 				require.Panics(t, func() {
 					d.DataTypeOf(tt.field)
 				})
+
 				return
 			}
 			require.Equal(t, tt.dataType, d.DataTypeOf(tt.field))

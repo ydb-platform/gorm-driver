@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 
-	ydb "github.com/ydb-platform/gorm-driver"
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 	"gorm.io/gorm"
+
+	ydb "github.com/ydb-platform/gorm-driver"
 )
 
+//nolint:funlen
 func Example_query() {
 	type Product struct {
 		ID    uint `gorm:"primarykey;not null;autoIncrement:false"`
