@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm/schema"
 )
 
-func Test_schemaFieldToColumnType(t *testing.T) {
+func Test_schemaFieldToColumnType(t *testing.T) { //nolint:funlen
 	tests := []struct {
 		field     *schema.Field
 		typesType types.Type
@@ -57,6 +57,7 @@ func Test_schemaFieldToColumnType(t *testing.T) {
 						Bool:  true,
 						Valid: true,
 					}
+
 					return nil
 				},
 			},
@@ -93,6 +94,7 @@ func Test_schemaFieldToColumnType(t *testing.T) {
 
 			if tt.isErrors {
 				require.Error(t, err)
+
 				return
 			}
 			require.NoError(t, err)
@@ -119,7 +121,7 @@ func Test_schemaFieldToColumnType(t *testing.T) {
 	}
 }
 
-func Test_parseField(t *testing.T) {
+func Test_parseField(t *testing.T) { //nolint:funlen
 	tests := []struct {
 		field     *schema.Field
 		typesType types.Type
@@ -229,6 +231,7 @@ func Test_parseField(t *testing.T) {
 			columnType, typesType, err := parseField(tt.field)
 			if tt.isError {
 				require.Error(t, err)
+
 				return
 			}
 			require.NoError(t, err)

@@ -62,7 +62,7 @@ func (m Migrator) FullDataTypeOf(field *schema.Field) (expr clause.Expr) {
 }
 
 // CreateTable create table in database for values.
-func (m Migrator) CreateTable(values ...interface{}) error {
+func (m Migrator) CreateTable(values ...interface{}) error { //nolint:funlen
 	for _, value := range m.ReorderModels(values, false) {
 		tx := m.DB.Session(&gorm.Session{})
 
@@ -97,7 +97,7 @@ func (m Migrator) CreateTable(values ...interface{}) error {
 					primaryKeys = append(primaryKeys, clause.Column{Name: field.DBName})
 				}
 
-				values = append(values, primaryKeys)
+				values = append(values, any(primaryKeys))
 			}
 
 			for _, idx := range stmt.Schema.ParseIndexes() {
@@ -122,7 +122,7 @@ func (m Migrator) CreateTable(values ...interface{}) error {
 					}
 
 					createTableSQL += ","
-					values = append(values,
+					values = append(values, //nolint:forcetypeassert
 						clause.Column{Name: idx.Name},
 						tx.Migrator().(migrator.BuildIndexOptionsInterface).BuildIndexOptions(idx.Fields, stmt),
 					)
@@ -154,11 +154,13 @@ func (m Migrator) CreateTable(values ...interface{}) error {
 			}
 
 			err = tx.Exec(createTableSQL, values...).Error
+
 			return xerrors.WithStacktrace(err)
 		}); err != nil {
 			return xerrors.WithStacktrace(err)
 		}
 	}
+
 	return nil
 }
 
@@ -185,6 +187,7 @@ func (m Migrator) DropTable(models ...interface{}) error {
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -239,6 +242,7 @@ func (m Migrator) AddColumn(value interface{}, name string) error {
 				"ALTER TABLE ? ADD ? ?",
 				m.CurrentTable(stmt), clause.Column{Name: f.DBName}, m.DB.Migrator().FullDataTypeOf(f),
 			).Error
+
 			return xerrors.WithStacktrace(err)
 		}
 
@@ -256,6 +260,7 @@ func (m Migrator) DropColumn(value interface{}, name string) error {
 		err := m.DB.WithContext(ydbDriver.WithQueryMode(context.Background(), ydbDriver.SchemeQueryMode)).Exec(
 			"ALTER TABLE ? DROP COLUMN ?", m.CurrentTable(stmt), clause.Column{Name: name},
 		).Error
+
 		return xerrors.WithStacktrace(err)
 	})
 }
@@ -296,6 +301,7 @@ func (m Migrator) ColumnTypes(value interface{}) ([]gorm.ColumnType, error) {
 		var desc options.Description
 		err = cc.Table().Do(stmt.Context, func(ctx context.Context, s table.Session) (err error) {
 			desc, err = s.DescribeTable(ctx, pt)
+
 			return xerrors.WithStacktrace(err)
 		}, table.WithIdempotent())
 		if err != nil {
@@ -318,7 +324,7 @@ func (m Migrator) ColumnTypes(value interface{}) ([]gorm.ColumnType, error) {
 			}
 		}
 
-		return
+		return nil
 	})
 
 	return columnTypes, xerrors.WithStacktrace(execErr)
@@ -329,6 +335,7 @@ func (m Migrator) schemaByValue(model interface{}) (*schema.Schema, error) {
 	if err != nil {
 		return nil, xerrors.WithStacktrace(fmt.Errorf("error parsing schema: %w", err))
 	}
+
 	return s, nil
 }
 
@@ -336,6 +343,7 @@ func (m Migrator) fullTableName(tableName string) string {
 	d, ok := m.Dialector.(Dialector)
 	if !ok {
 		checkAndAddError(m.DB.Statement, xerrors.WithStacktrace(errors.New("error conversion to Dialector")))
+
 		return ""
 	}
 
@@ -344,12 +352,14 @@ func (m Migrator) fullTableName(tableName string) string {
 	db, err := m.DB.DB()
 	if err != nil {
 		checkAndAddError(m.DB.Statement, xerrors.WithStacktrace(errors.New("error getting DB")))
+
 		return ""
 	}
 
 	cc, err := ydbDriver.Unwrap(db)
 	if err != nil {
 		checkAndAddError(m.DB.Statement, xerrors.WithStacktrace(errors.New("error unwrapping db")))
+
 		return ""
 	}
 

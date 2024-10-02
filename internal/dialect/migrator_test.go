@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm/schema"
 )
 
-func TestMigrator_FullDataTypeOf(t *testing.T) {
+func TestMigrator_FullDataTypeOf(t *testing.T) { //nolint:funlen
 	tests := []struct {
 		name     string
 		field    *schema.Field
@@ -103,6 +103,7 @@ func TestMigrator_FullDataTypeOf(t *testing.T) {
 				require.Panics(t, func() {
 					m.FullDataTypeOf(tt.field)
 				})
+
 				return
 			}
 

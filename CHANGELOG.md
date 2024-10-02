@@ -1,3 +1,9 @@
+* Upgraded dependencies:
+  * github.com/ydb-platform/ydb-go-sdk-auth-environ to v0.5.0
+  * github.com/ydb-platform/ydb-go-sdk/v3 to v3.81.4
+  * gorm.io/gorm to v1.25.12
+* Added `WithQueryMode` context modifier and `QueryMode` constants
+
 ## v0.1.3
 * Upgraded dependencies:
   * github.com/golang-jwt/jwt/v4 v4.4.1 => v4.5.0

@@ -57,6 +57,7 @@ func toColumnType(f *schema.Field, t types.Type, opts ...toColumnTypeOption) (go
 			return nil, err
 		}
 	}
+
 	return columnType, nil
 }
 
@@ -64,6 +65,7 @@ func toColumnType(f *schema.Field, t types.Type, opts ...toColumnTypeOption) (go
 func parseField(f *schema.Field) (gorm.ColumnType, types.Type, error) {
 	wrapType := func(t types.Type) (gorm.ColumnType, types.Type, error) {
 		ct, err := toColumnType(f, t)
+
 		return ct, t, err
 	}
 

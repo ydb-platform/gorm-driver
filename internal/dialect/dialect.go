@@ -144,12 +144,14 @@ func (d Dialector) ClauseBuilders() map[string]clause.ClauseBuilder {
 			insert, ok := c.Expression.(clause.Insert)
 			if !ok {
 				c.Build(builder)
+
 				return
 			}
 
 			stmt, ok := builder.(*gorm.Statement)
 			if !ok {
 				c.Build(builder)
+
 				return
 			}
 
@@ -195,6 +197,7 @@ func (d Dialector) DataTypeOf(field *schema.Field) string {
 	if err != nil {
 		panic(fmt.Errorf("error getting field (model %s, field %s) type: %w", field.Schema.Name, field.Name, err))
 	}
+
 	return t.DatabaseTypeName()
 }
 
@@ -238,6 +241,7 @@ func (d Dialector) QuoteTo(writer clause.Writer, s string) {
 				backticksCount++
 			}
 			_ = writer.WriteByte(v)
+
 			continue
 		default:
 			if shiftDelimiter-continuousBacktick <= 0 && !underQuoted {

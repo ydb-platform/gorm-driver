@@ -1,6 +1,7 @@
 package ydb
 
 import (
+	"context"
 	"time"
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
@@ -29,6 +30,20 @@ func WithMaxIdleConns(n int) Option {
 
 func WithConnMaxIdleTime(d time.Duration) Option {
 	return dialect.WithConnMaxIdleTime(d)
+}
+
+type QueryMode = ydb.QueryMode
+
+const (
+	DataQueryMode      = ydb.DataQueryMode
+	ExplainQueryMode   = ydb.ExplainQueryMode
+	ScanQueryMode      = ydb.ScanQueryMode
+	SchemeQueryMode    = ydb.SchemeQueryMode
+	ScriptingQueryMode = ydb.ScriptingQueryMode
+)
+
+func WithQueryMode(ctx context.Context, mode QueryMode) context.Context {
+	return ydb.WithQueryMode(ctx, mode)
 }
 
 func Open(dsn string, opts ...Option) gorm.Dialector {

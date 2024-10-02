@@ -9,7 +9,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version: [ 1.21.x, 1.22.x ]
+        go-version: [ 1.21.x, 1.22.x, 1.23.x ]
         os: [ ubuntu, windows, macOS ]
     concurrency:
       group: unit-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}
@@ -38,8 +38,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version: [1.21.x, 1.22.x]
-        ydb-version: [23.3, 24.1]
+        go-version: [ 1.21.x, 1.22.x, 1.23.x ]
+        ydb-version: [23.3, 24.1, 24.2]
     concurrency:
       group: integration-${{ github.ref }}-${{ matrix.go-version }}-${{ matrix.ydb-version }}
       cancel-in-progress: true

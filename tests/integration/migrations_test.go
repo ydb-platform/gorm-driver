@@ -50,6 +50,7 @@ func TestSequentialAutoMigrate(t *testing.T) {
 	}
 }
 
+//nolint:funlen
 func TestMigrateColumn(t *testing.T) {
 	dsn, has := os.LookupEnv("YDB_CONNECTION_STRING")
 	if !has {
@@ -283,6 +284,7 @@ func TestCreateTableWithOptions(t *testing.T) {
 	var desc options.Description
 	err = driver.Table().Do(context.Background(), func(ctx context.Context, s table.Session) (err error) {
 		desc, err = s.DescribeTable(ctx, path.Join(driver.Name(), t.Name(), "products"))
+
 		return err
 	}, table.WithIdempotent())
 	require.NoError(t, err)
