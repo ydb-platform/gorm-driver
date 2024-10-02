@@ -1,3 +1,4 @@
+## v0.2.0
 * Upgraded dependencies:
   * github.com/ydb-platform/ydb-go-sdk-auth-environ to v0.5.0
   * github.com/ydb-platform/ydb-go-sdk/v3 to v3.81.4
