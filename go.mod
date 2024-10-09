@@ -5,7 +5,7 @@ go 1.21
 require (
 	github.com/google/uuid v1.6.0
 	github.com/ydb-platform/ydb-go-sdk-auth-environ v0.5.0
-	github.com/ydb-platform/ydb-go-sdk/v3 v3.81.4
+	github.com/ydb-platform/ydb-go-sdk/v3 v3.84.1
 	gorm.io/gorm v1.25.12
 )
 
