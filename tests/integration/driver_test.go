@@ -3,7 +3,9 @@ package integration
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
+	"path"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -26,9 +28,12 @@ func TestDriver(t *testing.T) {
 		t.Skip("skip test '" + t.Name() + "' without env 'YDB_CONNECTION_STRING'")
 	}
 
+	url, err := url.Parse(dsn)
+	require.NoError(t, err)
+
 	db, err := gorm.Open(
 		ydb.Open(dsn,
-			ydb.WithTablePathPrefix(t.Name()),
+			ydb.WithTablePathPrefix(path.Join(url.Path, t.Name())),
 			ydb.With(environ.WithEnvironCredentials()),
 		),
 	)

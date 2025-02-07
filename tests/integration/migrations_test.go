@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"path"
 	"testing"
@@ -29,13 +30,14 @@ func TestSequentialAutoMigrate(t *testing.T) {
 		t.Skip("skip test '" + t.Name() + "' without env 'YDB_CONNECTION_STRING'")
 	}
 
-	pathPrefix := t.Name()
+	url, err := url.Parse(dsn)
+	require.NoError(t, err)
 
 	for i := 0; i < 5; i++ {
 		t.Run("", func(t *testing.T) {
 			db, err := gorm.Open(
 				ydb.Open(dsn,
-					ydb.WithTablePathPrefix(pathPrefix),
+					ydb.WithTablePathPrefix(path.Join(url.Path, t.Name())),
 					ydb.With(environ.WithEnvironCredentials()),
 				),
 			)
@@ -57,9 +59,12 @@ func TestMigrateColumn(t *testing.T) {
 		t.Skip("skip test '" + t.Name() + "' without env 'YDB_CONNECTION_STRING'")
 	}
 
+	url, err := url.Parse(dsn)
+	require.NoError(t, err)
+
 	db, err := gorm.Open(
 		ydb.Open(dsn,
-			ydb.WithTablePathPrefix(t.Name()),
+			ydb.WithTablePathPrefix(path.Join(url.Path, t.Name())),
 			ydb.With(environ.WithEnvironCredentials()),
 		),
 	)
@@ -261,9 +266,12 @@ func TestCreateTableWithOptions(t *testing.T) {
 		t.Skip("skip test '" + t.Name() + "' without env 'YDB_CONNECTION_STRING'")
 	}
 
+	url, err := url.Parse(dsn)
+	require.NoError(t, err)
+
 	db, err := gorm.Open(
 		ydb.Open(dsn,
-			ydb.WithTablePathPrefix(t.Name()),
+			ydb.WithTablePathPrefix(path.Join(url.Path, t.Name())),
 			ydb.With(environ.WithEnvironCredentials()),
 		),
 	)

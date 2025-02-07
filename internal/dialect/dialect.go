@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"path"
 	"strconv"
 	"sync"
 	"time"
@@ -100,8 +99,6 @@ func (d Dialector) Initialize(db *gorm.DB) error {
 		if err != nil {
 			return xerrors.WithStacktrace(fmt.Errorf("connect error: %w", err))
 		}
-
-		d.tablePathPrefix = path.Join(cc.Name(), d.tablePathPrefix)
 
 		c, err := ydb.Connector(cc,
 			ydb.WithTablePathPrefix(d.tablePathPrefix),
