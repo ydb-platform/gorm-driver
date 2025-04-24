@@ -107,6 +107,21 @@ func parseField(f *schema.Field) (gorm.ColumnType, types.Type, error) {
 		return wrapType(types.TypeBytes)
 	case schema.Time:
 		return wrapType(types.TypeTimestamp)
+	case "json": // considering implementation of Json field via datatypes.JSON type from "gorm.io/datatypes" package
+		if f.TagSettings["TYPE"] == "" {
+			return nil, nil, xerrors.WithStacktrace(fmt.Errorf("empty type tag. Possible values: [\"Json\",\"JsonDocument\", \"Yson\"]"))
+		}
+		switch f.TagSettings["TYPE"] {
+		case "Json":
+			return wrapType(types.TypeJSON)
+		case "JsonDocument":
+			return wrapType(types.TypeJSONDocument)
+		case "Yson":
+			return wrapType(types.TypeYSON)
+		default:
+			return nil, nil, xerrors.WithStacktrace(fmt.Errorf("unsupported json type '%s'. Possible values: "+
+				"[\"Json\", \"JsonDocument\", \"Yson\"]", f.Tag))
+		}
 	default:
 		return nil, nil, xerrors.WithStacktrace(fmt.Errorf("unsupported data type '%s'", f.DataType))
 	}
