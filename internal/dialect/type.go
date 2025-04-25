@@ -3,6 +3,7 @@ package dialect
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"gorm.io/gorm"
@@ -68,6 +69,30 @@ func parseField(f *schema.Field) (gorm.ColumnType, types.Type, error) {
 
 		return ct, t, err
 	}
+	if tp, ok := f.TagSettings["TYPE"]; ok {
+		switch strings.ToLower(tp) {
+		case "json":
+			if f.Serializer == nil {
+				f.Serializer = DefaultYdbJSONSerializer{}
+			}
+			return wrapType(types.TypeJSON)
+		case "jsondocument":
+			if f.Serializer == nil {
+				f.Serializer = DefaultYdbJSONSerializer{}
+			}
+			return wrapType(types.TypeJSONDocument)
+		case "yson":
+			if f.Serializer == nil {
+				f.Serializer = DefaultYdbJSONSerializer{}
+			}
+			return wrapType(types.TypeYSON)
+		}
+	}
+
+	if v, ok := f.TagSettings["SERIALIZER"]; ok && strings.EqualFold(v, "json") {
+		f.Serializer = schema.JSONSerializer{}
+		return wrapType(types.TypeJSONDocument)
+	}
 
 	switch f.DataType {
 	case schema.Bool:
@@ -107,21 +132,6 @@ func parseField(f *schema.Field) (gorm.ColumnType, types.Type, error) {
 		return wrapType(types.TypeBytes)
 	case schema.Time:
 		return wrapType(types.TypeTimestamp)
-	case "json": // considering implementation of Json field via datatypes.JSON type from "gorm.io/datatypes" package
-		if f.TagSettings["TYPE"] == "" {
-			return nil, nil, xerrors.WithStacktrace(fmt.Errorf("empty type tag. Possible values: [\"Json\",\"JsonDocument\", \"Yson\"]"))
-		}
-		switch f.TagSettings["TYPE"] {
-		case "Json":
-			return wrapType(types.TypeJSON)
-		case "JsonDocument":
-			return wrapType(types.TypeJSONDocument)
-		case "Yson":
-			return wrapType(types.TypeYSON)
-		default:
-			return nil, nil, xerrors.WithStacktrace(fmt.Errorf("unsupported json type '%s'. Possible values: "+
-				"[\"Json\", \"JsonDocument\", \"Yson\"]", f.Tag))
-		}
 	default:
 		return nil, nil, xerrors.WithStacktrace(fmt.Errorf("unsupported data type '%s'", f.DataType))
 	}

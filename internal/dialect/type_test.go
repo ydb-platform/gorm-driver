@@ -296,7 +296,7 @@ func Test_parseField(t *testing.T) { //nolint:funlen
 		{
 			field: &schema.Field{
 				DBName:   uuid.New().String(),
-				DataType: "json",
+				DataType: "Json",
 			},
 			isError:   true,
 			typesType: types.TypeJSON,
