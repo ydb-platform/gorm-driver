@@ -82,6 +82,36 @@ func Test_schemaFieldToColumnType(t *testing.T) { //nolint:funlen
 				Size:     32,
 			},
 			typesType: types.TypeInt32,
+		}, {
+			field: &schema.Field{
+				DBName:   uuid.New().String(),
+				DataType: "json",
+				TagSettings: map[string]string{
+					"TYPE": "Json",
+				},
+			},
+			typesType: types.TypeJSON,
+		},
+		{
+			field: &schema.Field{
+				DBName:   uuid.New().String(),
+				DataType: "json",
+				TagSettings: map[string]string{
+					"TYPE": "JsonDocument",
+				},
+			},
+
+			typesType: types.TypeJSONDocument,
+		},
+		{
+			field: &schema.Field{
+				DBName:   uuid.New().String(),
+				DataType: "json",
+				TagSettings: map[string]string{
+					"TYPE": "Yson",
+				},
+			},
+			typesType: types.TypeYSON,
 		},
 	}
 	for _, tt := range tests {
@@ -220,6 +250,56 @@ func Test_parseField(t *testing.T) { //nolint:funlen
 				DataType: schema.Time,
 			},
 			typesType: types.TypeTimestamp,
+		},
+		{
+			field: &schema.Field{
+				DBName:   uuid.New().String(),
+				DataType: "json",
+				TagSettings: map[string]string{
+					"TYPE": "Json",
+				},
+			},
+			typesType: types.TypeJSON,
+		},
+		{
+			field: &schema.Field{
+				DBName:   uuid.New().String(),
+				DataType: "json",
+				TagSettings: map[string]string{
+					"TYPE": "JsonDocument",
+				},
+			},
+
+			typesType: types.TypeJSONDocument,
+		},
+		{
+			field: &schema.Field{
+				DBName:   uuid.New().String(),
+				DataType: "json",
+				TagSettings: map[string]string{
+					"TYPE": "Yson",
+				},
+			},
+			typesType: types.TypeYSON,
+		},
+		{
+			field: &schema.Field{
+				DBName:   uuid.New().String(),
+				DataType: "json",
+				TagSettings: map[string]string{
+					"TYPE": "UnknownFormat",
+				},
+			},
+			isError:   true,
+			typesType: types.TypeJSON,
+		},
+		{
+			field: &schema.Field{
+				DBName:   uuid.New().String(),
+				DataType: "Json",
+			},
+			isError:   true,
+			typesType: types.TypeJSON,
 		},
 		{
 			field:   &schema.Field{},
