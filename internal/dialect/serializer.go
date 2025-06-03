@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/ydb-platform/gorm-driver/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
-	"gorm.io/gorm/schema"
 	"reflect"
 	"strings"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
+	"gorm.io/gorm/schema"
+
+	"github.com/ydb-platform/gorm-driver/internal/xerrors"
 )
 
 // DefaultYdbJSONSerializer is implementation of default serializer in YDB format
