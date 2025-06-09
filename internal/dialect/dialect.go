@@ -91,7 +91,7 @@ func (d Dialector) Name() string {
 func (d Dialector) Initialize(db *gorm.DB) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-
+	schema.RegisterSerializer("json", DefaultYdbJSONSerializer{})
 	if d.Conn != nil {
 		db.ConnPool = d.Conn
 	} else {

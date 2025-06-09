@@ -3,6 +3,7 @@ package dialect
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"gorm.io/gorm"
@@ -67,6 +68,31 @@ func parseField(f *schema.Field) (gorm.ColumnType, types.Type, error) {
 		ct, err := toColumnType(f, t)
 
 		return ct, t, err
+	}
+	if tp, ok := f.TagSettings["TYPE"]; ok {
+		tp = strings.TrimSpace(tp)
+		switch strings.ToLower(tp) {
+		case "json":
+			if f.Serializer == nil {
+				f.Serializer = DefaultYdbJSONSerializer{}
+			}
+			return wrapType(types.TypeJSON)
+		case "jsondocument":
+			if f.Serializer == nil {
+				f.Serializer = DefaultYdbJSONSerializer{}
+			}
+			return wrapType(types.TypeJSONDocument)
+		case "yson":
+			if f.Serializer == nil {
+				f.Serializer = DefaultYdbJSONSerializer{}
+			}
+			return wrapType(types.TypeYSON)
+		}
+	}
+
+	if v, ok := f.TagSettings["SERIALIZER"]; ok && strings.EqualFold(v, "json") {
+		f.Serializer = schema.JSONSerializer{}
+		return wrapType(types.TypeJSONDocument)
 	}
 
 	switch f.DataType {
