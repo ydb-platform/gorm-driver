@@ -70,6 +70,7 @@ func parseField(f *schema.Field) (gorm.ColumnType, types.Type, error) {
 		return ct, t, err
 	}
 	if tp, ok := f.TagSettings["TYPE"]; ok {
+		tp = strings.TrimSpace(tp)
 		switch strings.ToLower(tp) {
 		case "json":
 			if f.Serializer == nil {
