@@ -21,7 +21,7 @@ func (DefaultYdbJSONSerializer) Scan(ctx context.Context, field *schema.Field, d
 	return schema.JSONSerializer{}.Scan(ctx, field, dst, dbValue)
 }
 
-// Value marshalize the Go value in JSON and wraps it in YDB value type
+// Value marshal the Go value in JSON and wraps it in YDB value type
 func (DefaultYdbJSONSerializer) Value(_ context.Context, field *schema.Field, _ reflect.Value, fieldValue interface{}) (interface{}, error) {
 	b, err := json.Marshal(fieldValue)
 	if err != nil {
